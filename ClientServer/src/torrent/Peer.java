@@ -8,21 +8,22 @@ import java.util.*;
 
 public class Peer implements Runnable
 {
-	
+
 	private File chunk_folder;
-	
+	private File received_file;
+
 	Socket requestSocket;           //socket connect to the server
 	ObjectOutputStream out;         //stream write to the socket
- 	ObjectInputStream in;          //stream read from the socket
+	ObjectInputStream in;          //stream read from the socket
 	String message;                //message send to the server
 	String MESSAGE;                //capitalized message read from the server
-	
+
 	Map<Integer, File> summary_local = new HashMap<Integer, File>();
 	Map<Integer, File> summary_diff = new HashMap<Integer, File>();
-	
+
 	private int peer_number;
-	
-	
+
+
 	public Peer(int peer_number)
 	{
 		this.peer_number = peer_number;
@@ -55,31 +56,31 @@ public class Peer implements Runnable
 		summary_diff = summary_in;
 		summary_diff.keySet().removeAll(summary_local.keySet());
 	}
-	
+
 	Set<Integer> sendDownloadList()
 	{
 		System.out.println("Chunk ID List sent by downloader...");
 		return summary_diff.keySet();
 	}
-	
+
 	Set<Integer> sendUploadList()
 	{
 		System.out.println("Chunk ID List sent by uploader...");
 		return summary_local.keySet();
 	}
-	
+
 	//Summary_diff_received is the requested list of files the downloader needs your to upload
 	void sendDownloadFiles(Set <Integer> summary_diff_received)
 	{
 		Set <Integer> files_to_upload = summary_diff_received;
-		
+
 		System.out.println("Chunk ID List received by uploader...");
 		for (Integer chunk_id : files_to_upload) {
-		  //Send file to downloader
+			//Send file to downloader
 			System.out.println(String.format("Sent chunk ID: %d to Peer ", chunk_id.toString()));  
 		}
 	}
-	
+
 	void receiveUploadFiles(Set <Integer> received)
 	{
 		int chunk_id=1;
@@ -90,44 +91,39 @@ public class Peer implements Runnable
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
+
 	}
-
-
-
 
 	public void run()
 	{
 		try{
 			//create a socket to connect to the server
 			requestSocket = new Socket("localhost", 8000);
-			System.out.println("Connected to localhost in port 8000");
+			System.out.println(String.format("Peer %d connected to localhost in port 8000...", peer_number));
 			//initialize inputStream and outputStream
 			out = new ObjectOutputStream(requestSocket.getOutputStream());
 			out.flush();
 			in = new ObjectInputStream(requestSocket.getInputStream());
-			
+
 			//get Input from standard input
 			BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
 			while(true)
 			{
-				System.out.print("Hello, please input a sentence: ");
-				//read a sentence from the standard input
-				message = bufferedReader.readLine();
-				//Send the sentence to the server
-				sendMessage(message);
-				//Receive the upperCase sentence from the server
-				MESSAGE = (String)in.readObject();
-				//show the message to the user
-				System.out.println("Receive message: " + MESSAGE);
+
+					File file = (File) in.readObject();
+					File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s", 1,".chunk"));
+					System.out.println(local.toString());
+					file.renameTo(local);
+				
+				//System.out.println("Receive message: " + MESSAGE);
 			}
 		}
 		catch (ConnectException e) {
-    			System.err.println("Connection refused. You need to initiate a server first.");
+			System.err.println("Connection refused. You need to initiate a server first.");
 		} 
 		catch ( ClassNotFoundException e ) {
-            		System.err.println("Class not found");
-        	} 
+			System.err.println("Class not found");
+		} 
 		catch(UnknownHostException unknownHost){
 			System.err.println("You are trying to connect to an unknown host!");
 		}
