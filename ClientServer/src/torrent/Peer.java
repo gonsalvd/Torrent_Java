@@ -9,6 +9,8 @@ import java.util.*;
 public class Peer implements Runnable
 {
 	
+	private File chunk_folder;
+	
 	Socket requestSocket;           //socket connect to the server
 	ObjectOutputStream out;         //stream write to the socket
  	ObjectInputStream in;          //stream read from the socket
@@ -17,6 +19,33 @@ public class Peer implements Runnable
 	
 	Map<Integer, File> summary_local = new HashMap<Integer, File>();
 	Map<Integer, File> summary_diff = new HashMap<Integer, File>();
+	
+	private int peer_number;
+	
+	
+	public Peer(int peer_number)
+	{
+		this.peer_number = peer_number;
+		makeFolder();
+	}
+	private void makeFolder()
+	{
+		try
+		{
+			chunk_folder = new File(TorrentProgram.FILE_FOLDER+String.format("/torrent_tmp/peer%d/",peer_number));
+			if (!chunk_folder.exists()) {
+				if (chunk_folder.mkdir()) {
+					System.out.println(String.format("Directory created for peer %d: %s ", peer_number, chunk_folder.toString()));
+				} else {
+					System.out.println("Failed to create directory!");
+				}
+			}
+		}
+		catch (Exception e)
+		{
+			System.out.println("Invalid file");
+		}
+	}
 
 	//keySet() compares keys, entrySet() both keys and values, values() only values
 	//key=chunk ID, values=local file location
@@ -65,10 +94,7 @@ public class Peer implements Runnable
 	}
 
 
-	public void Peer() 
-	{
 
-	}
 
 	public void run()
 	{

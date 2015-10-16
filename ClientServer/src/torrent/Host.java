@@ -30,19 +30,19 @@ public class Host implements Runnable {
 		this.num_of_users = num_of_users;
 		this.BYTE_TYPE = byte_type;
 		
+		makeFolder();
 		loadFile();
 		breakFile();
 	}
 	
-	public void loadFile()
+	private void makeFolder()
 	{
 		try
 		{
-			input_file = new File(this.filename);
-			chunk_folder = new File(input_file.getParent()+"/torrent_tmp/");
+			chunk_folder = new File(TorrentProgram.FILE_FOLDER+"/torrent_tmp/host/");
 			if (!chunk_folder.exists()) {
 				if (chunk_folder.mkdir()) {
-					System.out.println("Directory is created!");
+					System.out.println(String.format("Directory created for host: %s ", chunk_folder.toString()));
 				} else {
 					System.out.println("Failed to create directory!");
 				}
@@ -52,6 +52,12 @@ public class Host implements Runnable {
 		{
 			System.out.println("Invalid file");
 		}
+	}
+	
+	public void loadFile()
+	{
+		System.out.println("Loading file at Host...");
+		input_file = new File(this.filename);
 	}
 	
 	private void breakFile()
@@ -102,8 +108,8 @@ public class Host implements Runnable {
 				filePart = null;
 				num_of_chunks++;
 				
-				System.out.println(String.format("Filesize: %d", fileSize));
-				System.out.println(String.format("Location of Host chunk file: %s", chunk_file.toString()));
+//				System.out.println(String.format("Filesize: %d", fileSize));
+				System.out.println(String.format("Host has chunk ID %d chunk file: %s", num_of_chunks, chunk_file.toString()));
 			}
 			inputStream.close();
 		} catch (IOException exception) {
