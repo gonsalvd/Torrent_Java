@@ -9,11 +9,115 @@ import java.util.*;
 public class Host implements Runnable {
 
 	private static final int sPort = 8000;   //The server will be listening on this port number
+	private File input_file;
+	private File chunk_folder;
+	private static int size_of_chunks;
+	private static int num_of_chunks;
+	private static int num_of_users;
+	private String filename;
+	private String BYTE_TYPE = "kB";
+
 
 	public Host() throws Exception
 	{
 		
 	}
+	
+	public Host(String filename, int size_of_chunks, String byte_type, int num_of_users)
+	{
+		this.filename=filename;
+		this.size_of_chunks=size_of_chunks;
+		this.num_of_users = num_of_users;
+		this.BYTE_TYPE = byte_type;
+		
+		loadFile();
+		breakFile();
+	}
+	
+	public void loadFile()
+	{
+		try
+		{
+			input_file = new File(this.filename);
+			chunk_folder = new File(input_file.getParent()+"/torrent_tmp/");
+			if (!chunk_folder.exists()) {
+				if (chunk_folder.mkdir()) {
+					System.out.println("Directory is created!");
+				} else {
+					System.out.println("Failed to create directory!");
+				}
+			}
+		}
+		catch (Exception e)
+		{
+			System.out.println("Invalid file");
+		}
+	}
+	
+	private void breakFile()
+	{
+		File inputFile = new File(this.filename);
+		String outputFileName = chunk_folder.toString();
+		
+		FileInputStream inputStream;
+		FileOutputStream filePart;
+		
+		//Size of file in bytes
+		int fileSize = (int) inputFile.length();
+		System.out.println(String.format("Size of file in bytes: %d", fileSize));
+
+		num_of_chunks = 0;
+		int read = 0;
+		int readLength=0;
+		byte[] byteChunkPart;
+
+		
+		//Determine how to break file based on input
+		if( BYTE_TYPE == "kB" )
+		{
+			readLength = size_of_chunks * 1000;
+		} 
+		else if ( BYTE_TYPE == "MB" )
+		{
+			readLength = size_of_chunks * 1000000;
+		}
+
+		try 
+		{
+			//The fileinputstream becomes this buffer that gets smaller as your .read() out of it
+			inputStream = new FileInputStream(inputFile);
+
+			while (fileSize > 0) 
+			{
+				byteChunkPart = new byte[readLength];
+				//When you read from the inputstream then you are kind of decrementing it at the same time. Less is leftover. Original file remains intact.
+				read = inputStream.read(byteChunkPart, 0, readLength);
+				fileSize = fileSize - read;
+				File chunk_file = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s", num_of_chunks+1,".chunk"));
+				filePart = new FileOutputStream(chunk_file);
+				filePart.write(byteChunkPart);
+				filePart.flush();
+				filePart.close();
+				byteChunkPart = null;
+				filePart = null;
+				num_of_chunks++;
+				
+				System.out.println(String.format("Filesize: %d", fileSize));
+				System.out.println(String.format("Location of Host chunk file: %s", chunk_file.toString()));
+			}
+			inputStream.close();
+		} catch (IOException exception) {
+			exception.printStackTrace();
+		}
+	}
+	
+	public void distributeFile()
+	{
+		
+		//Remove files after distributing
+		
+	}
+	
 	
 	public void run() {
 		// TODO Auto-generated method stub
@@ -45,11 +149,6 @@ public class Host implements Runnable {
 				e.printStackTrace();
 			}
 		} 
-	}
-
-	public static void start() throws Exception
-	{
-
 	}
 
 	/**

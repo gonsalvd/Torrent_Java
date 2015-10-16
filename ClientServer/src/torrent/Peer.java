@@ -6,7 +6,7 @@ import java.nio.*;
 import java.nio.channels.*;
 import java.util.*;
 
-public class Peer 
+public class Peer implements Runnable
 {
 	
 	Socket requestSocket;           //socket connect to the server
@@ -15,14 +15,62 @@ public class Peer
 	String message;                //message send to the server
 	String MESSAGE;                //capitalized message read from the server
 	
-	Map<Integer,File> summary = new HashMap<Integer, File>();
+	Map<Integer, File> summary_local = new HashMap<Integer, File>();
+	Map<Integer, File> summary_diff = new HashMap<Integer, File>();
+
+	//keySet() compares keys, entrySet() both keys and values, values() only values
+	//key=chunk ID, values=local file location
+	void compareSummary(Map<Integer, File> summary_in)
+	{
+		//Summary_diff is the map that has all the keys local needs from upload (summary_in) side
+		summary_diff = summary_in;
+		summary_diff.keySet().removeAll(summary_local.keySet());
+	}
+	
+	Set<Integer> sendDownloadList()
+	{
+		System.out.println("Chunk ID List sent by downloader...");
+		return summary_diff.keySet();
+	}
+	
+	Set<Integer> sendUploadList()
+	{
+		System.out.println("Chunk ID List sent by uploader...");
+		return summary_local.keySet();
+	}
+	
+	//Summary_diff_received is the requested list of files the downloader needs your to upload
+	void sendDownloadFiles(Set <Integer> summary_diff_received)
+	{
+		Set <Integer> files_to_upload = summary_diff_received;
+		
+		System.out.println("Chunk ID List received by uploader...");
+		for (Integer chunk_id : files_to_upload) {
+		  //Send file to downloader
+			System.out.println(String.format("Sent chunk ID: %d to Peer ", chunk_id.toString()));  
+		}
+	}
+	
+	void receiveUploadFiles(Set <Integer> received)
+	{
+		int chunk_id=1;
+		try {
+			File received_file = File.createTempFile("chunk_id=1_peer_1",".tmp");
+			summary_local.put(chunk_id, received_file);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+
 
 	public void Peer() 
 	{
-		this.run();
+
 	}
 
-	void run()
+	public void run()
 	{
 		try{
 			//create a socket to connect to the server
