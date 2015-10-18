@@ -98,6 +98,7 @@ public class Peer implements Runnable
 
 	public void run()
 	{
+		int chunk_id;
 		try{
 			//create a socket to connect to the server
 			requestSocket = new Socket("localhost", 8000);
@@ -113,10 +114,10 @@ public class Peer implements Runnable
 			{
 				
 				//This seems lengthy
+				chunk_id=(Integer)in.readObject();
 				File file = (File) in.readObject();
-				System.out.println(file.toString());
-				File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s", 1,".chunk"));
-				System.out.println(local.toString());
+				File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s",chunk_id ,".chunk"));
+				System.out.println(String.format("Peer %d received file %s",peer_number,local.toString()));
 				file.renameTo(local);
 
 				//System.out.println("Receive message: " + MESSAGE);

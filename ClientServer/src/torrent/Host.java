@@ -204,10 +204,12 @@ public class Host implements Runnable {
 			for (int a=1; a<=num_of_chunks; a++)
 			{
 				chunk_id=a;
-				if (peer_num == (peer_num % num_of_chunks))
+				if (peer_num == (a % num_peers))
 				{
 					chunk_file = new File(host_summary.get(chunk_id));
 					try{
+						//Send a value of the chunk id first
+						out.writeObject(new Integer(chunk_id));
 						out.writeObject(chunk_file);
 						out.flush();
 						System.out.println(String.format("Sent chunk ID %d to Peer %d",chunk_id, peer_num));
