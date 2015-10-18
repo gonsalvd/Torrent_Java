@@ -20,6 +20,8 @@ public class Peer implements Runnable
 
 	Map<Integer, File> summary_local = new HashMap<Integer, File>();
 	Map<Integer, File> summary_diff = new HashMap<Integer, File>();
+	Set summary_sent;
+
 
 	private int peer_number;
 
@@ -105,16 +107,18 @@ public class Peer implements Runnable
 			out.flush();
 			in = new ObjectInputStream(requestSocket.getInputStream());
 
-			//get Input from standard input
-			BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
+			getChunks(summary_local);
+			
 			while(true)
 			{
-
-					File file = (File) in.readObject();
-					File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s", 1,".chunk"));
-					System.out.println(local.toString());
-					file.renameTo(local);
 				
+				//This seems lengthy
+				File file = (File) in.readObject();
+				System.out.println(file.toString());
+				File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s", 1,".chunk"));
+				System.out.println(local.toString());
+				file.renameTo(local);
+
 				//System.out.println("Receive message: " + MESSAGE);
 			}
 		}
@@ -143,11 +147,15 @@ public class Peer implements Runnable
 		}
 	}
 	//send a message to the output stream
-	void sendMessage(String msg)
+	void getChunks(Map<Integer, File> summary_local)
 	{
+		//NOTE: Had serialization issue. I guess you cannot send the 'raw' summary set, and neeed to make a new HashSe
+		summary_sent=new HashSet(summary_local.keySet());
 		try{
+			
 			//stream write the message
-			out.writeObject(msg);
+			System.out.println(String.format("Peer %d requested initial chunks from Host...", peer_number));
+			out.writeObject(summary_sent);
 			out.flush();
 		}
 		catch(IOException ioException){
