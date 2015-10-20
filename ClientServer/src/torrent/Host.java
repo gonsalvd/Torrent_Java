@@ -135,7 +135,7 @@ public class Host implements Runnable {
 		try {
 			while(true) {
 				try {
-					Thread peer_thread = new Handler(listener.accept(),clientNum, num_of_users, summary_local);
+					Thread peer_thread = new Handler(listener.accept(), num_of_users, summary_local);
 					peer_thread.start();
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
@@ -168,10 +168,11 @@ public class Host implements Runnable {
 		private Map<Integer,String> host_summary;
 		private Set<Integer> peer_summary;
 		private int num_peers;
+		volatile int chunk_id;
 
-		public Handler(Socket connection, int peer_num, int num_peers, Map<Integer,String> host_summary) {
+		public Handler(Socket connection, int num_peers, Map<Integer,String> host_summary) {
 			this.connection = connection;
-			this.peer_num = peer_num;
+			//this.peer_num = peer_num;
 			this.host_summary = host_summary;
 			this.num_peers = num_peers;
 		}
@@ -192,6 +193,7 @@ public class Host implements Runnable {
 		//send a message to the output stream
 		public void sendChunk()
 		{
+
 			//PROBLEM: We do not know how many total users there will be if we start sending chunks just as a connection is established in real life!
 			//SOLUTION: Send total number of users initially
 			//Mod function
@@ -200,15 +202,16 @@ public class Host implements Runnable {
 			//user 2 should get chunk 2, 8, 14
 			//user 3 should get chunk 3, 9, 15
 			File chunk_file;
-			int chunk_id;
 			for (int a=1; a<=num_of_chunks; a++)
 			{
+				System.out.println("a: "+a);
 				chunk_id=a;
 				if (peer_num == (a % num_peers))
 				{
 					chunk_file = new File(host_summary.get(chunk_id));
 					try{
 						//Send a value of the chunk id first
+						System.out.println(String.format("beg of write out for chunk_id %d for peer peer_num %d",chunk_id, peer_num));
 						out.writeObject(new Integer(chunk_id));
 						out.writeObject(chunk_file);
 						out.flush();
@@ -221,18 +224,6 @@ public class Host implements Runnable {
 					}
 				}
 			}
-//			int chunk_id=1;
-//			File chunk_file = new File(host_summary.get(chunk_id));
-//			try{
-//				out.writeObject(chunk_file);
-//				out.flush();
-//				System.out.println(String.format("Sent chunk ID %d to Peer %d",chunk_id, peer_num));
-//				//Delete file from Host
-//
-//			}
-//			catch(IOException ioException){
-//				ioException.printStackTrace();
-//			}
 		}
 
 		public void run() {
@@ -242,21 +233,19 @@ public class Host implements Runnable {
 				out.flush();
 				//sendChunk();
 				in = new ObjectInputStream(connection.getInputStream());
-//				if(peer_num==1)
-//				{
-//					sendChunk();
-//				}
 				try{
+					//Initialize peer
+					peer_num = (Integer) in.readObject();
 					while(true)
 					{
-						
+
 						//receive the message sent from the client
 						peer_summary = (Set<Integer>)in.readObject();
 						//show the message to the user
 						System.out.println("Receive message: " + peer_summary + " from client " + peer_num);
-						
 						sendChunk();
 					}
+
 				}
 				catch(ClassNotFoundException classnot){
 					System.err.println("Data received in unknown format");

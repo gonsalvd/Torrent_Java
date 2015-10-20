@@ -21,10 +21,8 @@ public class Peer implements Runnable
 	Map<Integer, File> summary_local = new HashMap<Integer, File>();
 	Map<Integer, File> summary_diff = new HashMap<Integer, File>();
 	Set summary_sent;
-
-
+	int chunk_id;
 	private int peer_number;
-
 
 	public Peer(int peer_number)
 	{
@@ -98,7 +96,6 @@ public class Peer implements Runnable
 
 	public void run()
 	{
-		int chunk_id;
 		try{
 			//create a socket to connect to the server
 			requestSocket = new Socket("localhost", 8000);
@@ -107,20 +104,21 @@ public class Peer implements Runnable
 			out = new ObjectOutputStream(requestSocket.getOutputStream());
 			out.flush();
 			in = new ObjectInputStream(requestSocket.getInputStream());
-
+			initializePeerNumberWithHost();
 			getChunks(summary_local);
-			
 			while(true)
 			{
-				
 				//This seems lengthy
 				chunk_id=(Integer)in.readObject();
+				System.out.println(String.format("Chunk ID %d inside Peer %d ",chunk_id,peer_number));
 				File file = (File) in.readObject();
+				System.out.println(String.format("File %s name inside while",file.toString()));
 				File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s",chunk_id ,".chunk"));
 				System.out.println(String.format("Peer %d received file %s",peer_number,local.toString()));
 				file.renameTo(local);
 
 				//System.out.println("Receive message: " + MESSAGE);
+
 			}
 		}
 		catch (ConnectException e) {
@@ -148,14 +146,14 @@ public class Peer implements Runnable
 		}
 	}
 	//send a message to the output stream
-	void getChunks(Map<Integer, File> summary_local)
+	synchronized void getChunks(Map<Integer, File> summary_local)
 	{
 		//NOTE: Had serialization issue. I guess you cannot send the 'raw' summary set, and neeed to make a new HashSe
 		summary_sent=new HashSet(summary_local.keySet());
 		try{
-			
 			//stream write the message
 			System.out.println(String.format("Peer %d requested initial chunks from Host...", peer_number));
+			
 			out.writeObject(summary_sent);
 			out.flush();
 		}
@@ -163,5 +161,17 @@ public class Peer implements Runnable
 			ioException.printStackTrace();
 		}
 	}
+	
+	void initializePeerNumberWithHost()
+	{
+		try {
+			out.writeObject(this.peer_number);
+			out.flush();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
 
 }
