@@ -52,16 +52,16 @@ public class TorrentProgram {
 	{
 		createHost();
 		createPeers();
-		host.distributeFile();
 	}
 
 	private void createPeers()
 	{
 		int peer_number = 0;
-		for (int a = 1; a <= num_of_users; a++)
+		for (int a = 0; a < num_of_users; a++)
 		{
 			peer_number = a;
 			peer = new Peer(peer_number);
+			peer.setPeerType("Download");
 			Thread p = new Thread(peer);
 			p.start();
 			peer_list.add(peer);

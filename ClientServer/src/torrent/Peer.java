@@ -24,10 +24,25 @@ public class Peer implements Runnable
 	int chunk_id;
 	private int peer_number;
 
+	private boolean isDownloadPeer = false;
+	private boolean isUploadPeer = false;
+
 	public Peer(int peer_number)
 	{
 		this.peer_number = peer_number;
 		makeFolder();
+	}
+	
+	public void setPeerType(String peer_type)
+	{
+		if (peer_type == "Upload")
+		{
+			isUploadPeer = true;
+		}
+		else if (peer_type == "Download")
+		{
+			isDownloadPeer = true;
+		}
 	}
 	private void makeFolder()
 	{
@@ -104,21 +119,25 @@ public class Peer implements Runnable
 			out = new ObjectOutputStream(requestSocket.getOutputStream());
 			out.flush();
 			in = new ObjectInputStream(requestSocket.getInputStream());
-			initializePeerNumberWithHost();
-			getChunks(summary_local);
-			while(true)
+
+			if (isDownloadPeer)
 			{
-				//This seems lengthy
-				chunk_id=(Integer)in.readObject();
-				System.out.println(String.format("Chunk ID %d inside Peer %d ",chunk_id,peer_number));
-				File file = (File) in.readObject();
-				System.out.println(String.format("File %s name inside while",file.toString()));
-				File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s",chunk_id ,".chunk"));
-				System.out.println(String.format("Peer %d received file %s",peer_number,local.toString()));
-				file.renameTo(local);
+				initializePeerNumberWithHost();
+				getChunks(summary_local);
+				while(true)
+				{
+					//This seems lengthy
+					chunk_id=(Integer)in.readObject();
+					System.out.println(String.format("Chunk ID %d inside Peer %d ",chunk_id,peer_number));
+					File file = (File) in.readObject();
+					System.out.println(String.format("File %s name inside while",file.toString()));
+					File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s",chunk_id ,".chunk"));
+					System.out.println(String.format("Peer %d received file %s",peer_number,local.toString()));
+					file.renameTo(local);
 
-				//System.out.println("Receive message: " + MESSAGE);
 
+
+				}
 			}
 		}
 		catch (ConnectException e) {
@@ -153,7 +172,7 @@ public class Peer implements Runnable
 		try{
 			//stream write the message
 			System.out.println(String.format("Peer %d requested initial chunks from Host...", peer_number));
-			
+
 			out.writeObject(summary_sent);
 			out.flush();
 		}
@@ -161,7 +180,7 @@ public class Peer implements Runnable
 			ioException.printStackTrace();
 		}
 	}
-	
+
 	void initializePeerNumberWithHost()
 	{
 		try {
@@ -172,6 +191,6 @@ public class Peer implements Runnable
 			e.printStackTrace();
 		}
 	}
-	
+
 
 }

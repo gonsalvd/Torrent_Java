@@ -93,8 +93,8 @@ public class Host implements Runnable {
 				//When you read from the inputstream then you are kind of decrementing it at the same time. Less is leftover. Original file remains intact.
 				read = inputStream.read(byteChunkPart, 0, readLength);
 				fileSize = fileSize - read;
-				File chunk_file = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s", num_of_chunks+1,".chunk"));
-				summary_local.put(new Integer(num_of_chunks+1), chunk_file.toString());
+				File chunk_file = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s", num_of_chunks,".chunk"));
+				summary_local.put(new Integer(num_of_chunks), chunk_file.toString());
 				filePart = new FileOutputStream(chunk_file);
 				filePart.write(byteChunkPart);
 				filePart.flush();
@@ -112,14 +112,6 @@ public class Host implements Runnable {
 		}
 		System.out.println(String.format("File broken at Host into %d chunks...", num_of_chunks));
 	}
-
-	public void distributeFile()
-	{
-		//Distribute file based on peer number
-
-
-	}
-
 
 	public void run() {
 		// TODO Auto-generated method stub
@@ -152,121 +144,4 @@ public class Host implements Runnable {
 			}
 		} 
 	}
-
-	/**
-	 * A handler thread class.  Handlers are spawned from the listening
-	 * loop and are responsible for dealing with a single client's requests.
-	 */
-	private static class Handler extends Thread {
-
-		private String message;    //message received from the client
-		private String MESSAGE;    //uppercase message send to the client
-		private Socket connection;
-		private ObjectInputStream in;	//stream read from the socket
-		private ObjectOutputStream out;    //stream write to the socket
-		private int peer_num;		//The index number of the client
-		private Map<Integer,String> host_summary;
-		private Set<Integer> peer_summary;
-		private int num_peers;
-		volatile int chunk_id;
-
-		public Handler(Socket connection, int num_peers, Map<Integer,String> host_summary) {
-			this.connection = connection;
-			//this.peer_num = peer_num;
-			this.host_summary = host_summary;
-			this.num_peers = num_peers;
-		}
-
-		//send a message to the output stream
-		public void sendMessage(String msg)
-		{
-			try{
-				out.writeObject(msg);
-				out.flush();
-				System.out.println("Send message: " + msg + " to Client " + peer_num);
-			}
-			catch(IOException ioException){
-				ioException.printStackTrace();
-			}
-		}
-
-		//send a message to the output stream
-		public void sendChunk()
-		{
-
-			//PROBLEM: We do not know how many total users there will be if we start sending chunks just as a connection is established in real life!
-			//SOLUTION: Send total number of users initially
-			//Mod function
-			//ex 19 chunks, 6 users, 19 mod 1
-			//user 1 should get chunk 1, 7, 13, 19
-			//user 2 should get chunk 2, 8, 14
-			//user 3 should get chunk 3, 9, 15
-			File chunk_file;
-			for (int a=1; a<=num_of_chunks; a++)
-			{
-				System.out.println("a: "+a);
-				chunk_id=a;
-				if (peer_num == (a % num_peers))
-				{
-					chunk_file = new File(host_summary.get(chunk_id));
-					try{
-						//Send a value of the chunk id first
-						System.out.println(String.format("beg of write out for chunk_id %d for peer peer_num %d",chunk_id, peer_num));
-						out.writeObject(new Integer(chunk_id));
-						out.writeObject(chunk_file);
-						out.flush();
-						System.out.println(String.format("Sent chunk ID %d to Peer %d",chunk_id, peer_num));
-						//Delete file from Host
-
-					}
-					catch(IOException ioException){
-						ioException.printStackTrace();
-					}
-				}
-			}
-		}
-
-		public void run() {
-			try{
-				//initialize Input and Output streams
-				out = new ObjectOutputStream(connection.getOutputStream());
-				out.flush();
-				//sendChunk();
-				in = new ObjectInputStream(connection.getInputStream());
-				try{
-					//Initialize peer
-					peer_num = (Integer) in.readObject();
-					while(true)
-					{
-
-						//receive the message sent from the client
-						peer_summary = (Set<Integer>)in.readObject();
-						//show the message to the user
-						System.out.println("Receive message: " + peer_summary + " from client " + peer_num);
-						sendChunk();
-					}
-
-				}
-				catch(ClassNotFoundException classnot){
-					System.err.println("Data received in unknown format");
-				}
-			}
-			catch(IOException ioException){
-				System.out.println("Disconnect with Peer " + peer_num);
-			}
-			finally{
-				//Close connections
-				try{
-					in.close();
-					out.close();
-					connection.close();
-				}
-				catch(IOException ioException){
-					System.out.println("Disconnect with Peer " + peer_num);
-				}
-			}
-		}
-	}
-
-
 }
