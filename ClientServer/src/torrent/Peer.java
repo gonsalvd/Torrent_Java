@@ -13,6 +13,10 @@ public class Peer implements Runnable
 	private File received_file;
 
 	Socket requestSocket;           //socket connect to the server
+	Socket uploadSocket;
+//	ServerSocket uploadSocket = null;
+//	private int sPort;   //The server will be listening on this port number
+
 	ObjectOutputStream out;         //stream write to the socket
 	ObjectInputStream in;          //stream read from the socket
 	String message;                //message send to the server
@@ -24,6 +28,7 @@ public class Peer implements Runnable
 	int chunk_id;
 	private int peer_number;
 
+
 	private boolean isDownloadPeer = false;
 	private boolean isUploadPeer = false;
 
@@ -31,8 +36,14 @@ public class Peer implements Runnable
 	{
 		this.peer_number = peer_number;
 		makeFolder();
+//		sPort = 20000 + peer_number;
 	}
 	
+	public Socket getUploadSocket()
+	{
+		return uploadSocket;
+	}
+
 	public void setPeerType(String peer_type)
 	{
 		if (peer_type == "Upload")
@@ -106,7 +117,6 @@ public class Peer implements Runnable
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-
 	}
 
 	public void run()
@@ -119,25 +129,27 @@ public class Peer implements Runnable
 			out = new ObjectOutputStream(requestSocket.getOutputStream());
 			out.flush();
 			in = new ObjectInputStream(requestSocket.getInputStream());
-
-			if (isDownloadPeer)
+			
+			//Act as server and connect with peer
+//			int next_peer = (peer_number + 1) % TorrentProgram.num_of_users;
+//			Thread peer_thread = new Handler(TorrentProgram.peer_list.get(next_peer).getUploadSocket(), summary_local);
+//			peer_thread.start();
+			
+			//initializePeerNumberWithHost();
+			getChunks(summary_local);
+			
+			while(true)
 			{
-				initializePeerNumberWithHost();
-				getChunks(summary_local);
-				while(true)
-				{
-					//This seems lengthy
-					chunk_id=(Integer)in.readObject();
-					System.out.println(String.format("Chunk ID %d inside Peer %d ",chunk_id,peer_number));
-					File file = (File) in.readObject();
-					System.out.println(String.format("File %s name inside while",file.toString()));
-					File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s",chunk_id ,".chunk"));
-					System.out.println(String.format("Peer %d received file %s",peer_number,local.toString()));
-					file.renameTo(local);
-
-
-
-				}
+				//This seems lengthy
+				chunk_id=(Integer)in.readObject();
+				//Flag end of sending chunks
+				System.out.println(String.format("Chunk ID %d inside Peer %d ",chunk_id,peer_number));
+				File file = (File) in.readObject();
+				System.out.println(String.format("File %s name inside while",file.toString()));
+				File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s",chunk_id ,".chunk"));
+				System.out.println(String.format("Peer %d received file %s",peer_number,local.toString()));
+				file.renameTo(local);
+				summary_local.put(chunk_id, local);
 			}
 		}
 		catch (ConnectException e) {

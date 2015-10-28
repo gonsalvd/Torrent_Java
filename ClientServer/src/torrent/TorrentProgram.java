@@ -14,11 +14,11 @@ public class TorrentProgram {
 
 	private String filename;
 	public static String FILE_FOLDER;
-	private int num_of_users;
+	public static int num_of_users;
 	private static int num_of_chunks;
 	private int size_of_chunks;
 	private String BYTE_TYPE = "kB";
-	ArrayList<Peer> peer_list = new ArrayList<Peer>();
+	static ArrayList<Peer> peer_list = new ArrayList<Peer>();
 	File local;
 	Host host;
 	Peer peer;

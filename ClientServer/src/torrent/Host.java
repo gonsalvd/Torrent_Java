@@ -16,7 +16,9 @@ public class Host implements Runnable {
 	private int num_of_users;
 	private String filename;
 	private String BYTE_TYPE = "kB";
-	private Map<Integer, String> summary_local = new HashMap<Integer, String>();
+	private Map<Integer, File> summary_local = new HashMap<Integer, File>();
+	private Map<Integer, File> summary_user = new HashMap<Integer, File>();
+
 
 	public Host(String filename, int size_of_chunks, String byte_type, int num_of_users)
 	{
@@ -24,10 +26,55 @@ public class Host implements Runnable {
 		this.size_of_chunks=size_of_chunks;
 		this.num_of_users = num_of_users;
 		this.BYTE_TYPE = byte_type;
-
 		makeFolder();
 	}
+	
+	public Map<Integer,File> createUserSpecificSummary(int clientNumber)
+	{
+		Map<Integer, File> summary_user = new HashMap<Integer,File>();
+		for (int a=0; a<summary_local.size(); a++)
+		{
+			if (clientNumber == (a % TorrentProgram.num_of_users))
+			{
+				System.out.println("here");
+				summary_user.put(a, summary_local.get(a));
+			}
+		}
+		return summary_user;
+	}
 
+	public void run() {
+		// TODO Auto-generated method stub
+		System.out.println("The Host is running..."); 
+		ServerSocket listener = null;
+		try {
+			listener = new ServerSocket(sPort);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		int clientNum = 0;
+		try {
+			while(true) {
+				try {					
+					Thread peer_thread = new Handler(listener.accept(), createUserSpecificSummary(clientNum));
+					peer_thread.start();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				clientNum++;
+			}
+		} finally {
+			try {
+				listener.close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		} 
+	}
+	
 	private void makeFolder()
 	{
 		try
@@ -94,54 +141,23 @@ public class Host implements Runnable {
 				read = inputStream.read(byteChunkPart, 0, readLength);
 				fileSize = fileSize - read;
 				File chunk_file = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s", num_of_chunks,".chunk"));
-				summary_local.put(new Integer(num_of_chunks), chunk_file.toString());
+				summary_local.put(new Integer(num_of_chunks), chunk_file);
 				filePart = new FileOutputStream(chunk_file);
 				filePart.write(byteChunkPart);
 				filePart.flush();
 				filePart.close();
 				byteChunkPart = null;
 				filePart = null;
+				System.out.println(String.format("Host has chunk ID %d chunk file: %s", num_of_chunks, chunk_file.toString()));
+
 				num_of_chunks++;
 
 				//				System.out.println(String.format("Filesize: %d", fileSize));
-				System.out.println(String.format("Host has chunk ID %d chunk file: %s", num_of_chunks, chunk_file.toString()));
 			}
 			inputStream.close();
 		} catch (IOException exception) {
 			exception.printStackTrace();
 		}
 		System.out.println(String.format("File broken at Host into %d chunks...", num_of_chunks));
-	}
-
-	public void run() {
-		// TODO Auto-generated method stub
-		System.out.println("The Host is running..."); 
-		ServerSocket listener = null;
-		try {
-			listener = new ServerSocket(sPort);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		int clientNum = 1;
-		try {
-			while(true) {
-				try {
-					Thread peer_thread = new Handler(listener.accept(), num_of_users, summary_local);
-					peer_thread.start();
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-				clientNum++;
-			}
-		} finally {
-			try {
-				listener.close();
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		} 
 	}
 }
