@@ -43,42 +43,37 @@ public class Peer implements Runnable
 
 	private void recreateFile()
 	{
-		File inputFile = new File("test");
-		String outputFileName = chunk_folder.toString();
+		String fileOutputName = "song.mp3";
+		File full_file = new File(chunk_folder.toString()+"/"+fileOutputName);
 
 		FileInputStream inputStream;
-		FileOutputStream filePart;
-
-		//Size of file in bytes
-		int fileSize = (int) inputFile.length();
-
-		int read = 0;
-		int readLength=0;
-		byte[] byteChunkPart;
-
-		for (int a=0; a<chunk_folder.length(); a++)
+		FileOutputStream fileFull;
+		
+		String outputFolderName = chunk_folder.toString();
+		File directory = new File(outputFolderName);
+		File[] directoryListing = directory.listFiles();
+		for (File chunk_file : directoryListing)
 		{
-			try 
-			{
-				//The fileinputstream becomes this buffer that gets smaller as your .read() out of it
-				inputStream = new FileInputStream(inputFile);
-				byteChunkPart = new byte[readLength];
-				//When you read from the inputstream then you are kind of decrementing it at the same time. Less is leftover. Original file remains intact.
-				read = inputStream.read(byteChunkPart, 0, readLength);
-				fileSize = fileSize - read;
-				File chunk_file = new File(chunk_folder.toString()+"/"+String.format("song.mp3"));
-				filePart = new FileOutputStream(chunk_file);
-				filePart.write(byteChunkPart);
-				filePart.flush();
-				filePart.close();
-				byteChunkPart = null;
-				filePart = null;
+			try {
+				//Size of file in bytes
+				int fileSize = (int) chunk_file.length();
+				byte[] byteChunkPart;
+				byteChunkPart = new byte[fileSize];
+				inputStream = new FileInputStream(chunk_file);
+				inputStream.read(byteChunkPart, 0, fileSize);
+				fileFull = new FileOutputStream(full_file,true);
+				fileFull.write(byteChunkPart);
+				fileFull.flush();
 				inputStream.close();
-
+				fileFull.close();
+			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			} catch (IOException exception) {
 				exception.printStackTrace();
 			}
 		}
+		System.out.println(String.format("Combined chunks in Peer %d to form file %s in %s", peer_number,fileOutputName, chunk_folder.toString()));
 	}
 
 	private void makeFolder()
@@ -224,6 +219,7 @@ public class Peer implements Runnable
 					System.out.println(String.format("Peer %d received chunk %d to give summary list: %s", peer_number, chunk_id2, summary_local.keySet().toString()));
 				}
 			}
+			recreateFile();
 		}
 		catch (ConnectException e) {
 			System.err.println("Connection refused. You need to initiate a server first.");
