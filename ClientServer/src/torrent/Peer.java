@@ -13,12 +13,15 @@ public class Peer implements Runnable
 	private File received_file;
 
 	Socket requestSocket;           //socket connect to the server
-	Socket uploadSocket;
-//	ServerSocket uploadSocket = null;
-//	private int sPort;   //The server will be listening on this port number
+	Socket downloadSocket;
+	ServerSocket uploadSocket;
+	//	ServerSocket uploadSocket = null;
+	//	private int sPort;   //The server will be listening on this port number
 
 	ObjectOutputStream out;         //stream write to the socket
 	ObjectInputStream in;          //stream read from the socket
+	ObjectOutputStream out2;         //stream write to the socket
+	ObjectInputStream in2;          //stream read from the socket
 	String message;                //message send to the server
 	String MESSAGE;                //capitalized message read from the server
 
@@ -26,35 +29,58 @@ public class Peer implements Runnable
 	Map<Integer, File> summary_diff = new HashMap<Integer, File>();
 	Set summary_sent;
 	int chunk_id;
+	int chunk_id2;
 	private int peer_number;
+	private int prev_peer;
+	boolean notConnected = true;
 
-
-	private boolean isDownloadPeer = false;
-	private boolean isUploadPeer = false;
 
 	public Peer(int peer_number)
 	{
 		this.peer_number = peer_number;
 		makeFolder();
-//		sPort = 20000 + peer_number;
-	}
-	
-	public Socket getUploadSocket()
-	{
-		return uploadSocket;
 	}
 
-	public void setPeerType(String peer_type)
+	private void recreateFile()
 	{
-		if (peer_type == "Upload")
+		File inputFile = new File("test");
+		String outputFileName = chunk_folder.toString();
+
+		FileInputStream inputStream;
+		FileOutputStream filePart;
+
+		//Size of file in bytes
+		int fileSize = (int) inputFile.length();
+
+		int read = 0;
+		int readLength=0;
+		byte[] byteChunkPart;
+
+		for (int a=0; a<chunk_folder.length(); a++)
 		{
-			isUploadPeer = true;
-		}
-		else if (peer_type == "Download")
-		{
-			isDownloadPeer = true;
+			try 
+			{
+				//The fileinputstream becomes this buffer that gets smaller as your .read() out of it
+				inputStream = new FileInputStream(inputFile);
+				byteChunkPart = new byte[readLength];
+				//When you read from the inputstream then you are kind of decrementing it at the same time. Less is leftover. Original file remains intact.
+				read = inputStream.read(byteChunkPart, 0, readLength);
+				fileSize = fileSize - read;
+				File chunk_file = new File(chunk_folder.toString()+"/"+String.format("song.mp3"));
+				filePart = new FileOutputStream(chunk_file);
+				filePart.write(byteChunkPart);
+				filePart.flush();
+				filePart.close();
+				byteChunkPart = null;
+				filePart = null;
+				inputStream.close();
+
+			} catch (IOException exception) {
+				exception.printStackTrace();
+			}
 		}
 	}
+
 	private void makeFolder()
 	{
 		try
@@ -74,15 +100,6 @@ public class Peer implements Runnable
 		}
 	}
 
-	//keySet() compares keys, entrySet() both keys and values, values() only values
-	//key=chunk ID, values=local file location
-	void compareSummary(Map<Integer, File> summary_in)
-	{
-		//Summary_diff is the map that has all the keys local needs from upload (summary_in) side
-		summary_diff = summary_in;
-		summary_diff.keySet().removeAll(summary_local.keySet());
-	}
-
 	Set<Integer> sendDownloadList()
 	{
 		System.out.println("Chunk ID List sent by downloader...");
@@ -95,61 +112,117 @@ public class Peer implements Runnable
 		return summary_local.keySet();
 	}
 
-	//Summary_diff_received is the requested list of files the downloader needs your to upload
-	void sendDownloadFiles(Set <Integer> summary_diff_received)
+	private boolean doNotHaveChunks()
 	{
-		Set <Integer> files_to_upload = summary_diff_received;
-
-		System.out.println("Chunk ID List received by uploader...");
-		for (Integer chunk_id : files_to_upload) {
-			//Send file to downloader
-			System.out.println(String.format("Sent chunk ID: %d to Peer ", chunk_id.toString()));  
-		}
-	}
-
-	void receiveUploadFiles(Set <Integer> received)
-	{
-		int chunk_id=1;
-		try {
-			File received_file = File.createTempFile("chunk_id=1_peer_1",".tmp");
-			summary_local.put(chunk_id, received_file);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		return summary_local.size() < Host.num_of_chunks;
 	}
 
 	public void run()
 	{
-		try{
+		try
+		{
 			//create a socket to connect to the server
 			requestSocket = new Socket("localhost", 8000);
-			System.out.println(String.format("Peer %d connected to localhost in port 8000...", peer_number));
+			System.out.println(String.format("Peer %d connected to Host in port 8000", peer_number));
 			//initialize inputStream and outputStream
 			out = new ObjectOutputStream(requestSocket.getOutputStream());
 			out.flush();
 			in = new ObjectInputStream(requestSocket.getInputStream());
-			
-			//Act as server and connect with peer
-//			int next_peer = (peer_number + 1) % TorrentProgram.num_of_users;
-//			Thread peer_thread = new Handler(TorrentProgram.peer_list.get(next_peer).getUploadSocket(), summary_local);
-//			peer_thread.start();
-			
-			//initializePeerNumberWithHost();
-			getChunks(summary_local);
-			
-			while(true)
+
+			//SETUP PEER TO PEER CONNECTIONS
+			//EXAMPLE: Peer 2 uploads to Peer 3 on port 20002, Peer 3 downloads from Peer 2 on port 20002
+
+			//Create connection as UPLOADER to other peer
+			int next_peer = Math.floorMod((peer_number + 1),TorrentProgram.num_of_users);
+			int upload_port = 20000 + peer_number;
+			System.out.println(String.format("Peer %d is the uploader to Peer %d on port %d", peer_number, next_peer, upload_port));
+			uploadSocket = new ServerSocket(upload_port);
+
+			//Create connection as DOWNLOADER to other peer
+			while (notConnected)
 			{
-				//This seems lengthy
+				try{
+					prev_peer = Math.floorMod((peer_number - 1),TorrentProgram.num_of_users);
+					int prev_peer_port = 20000 + prev_peer;
+
+					downloadSocket = new Socket("localhost", prev_peer_port);
+					System.out.println(String.format("Peer %d is the downloader to Peer %d on port %d", peer_number, prev_peer, prev_peer_port));
+
+
+					//Start Thread of Peer to Peer
+					Thread peer_thread = new Handler(uploadSocket.accept(), summary_local,String.format("Peer %d",peer_number));
+					System.out.println(String.format("Peer %d succesfully started its own UPLOAD thread on port %d with Peer %d", peer_number, upload_port, next_peer));
+					peer_thread.start();
+
+					//initialize inputStream and outputStream
+					out2 = new ObjectOutputStream(downloadSocket.getOutputStream());
+					out2.flush();
+					in2 = new ObjectInputStream(downloadSocket.getInputStream());
+
+					notConnected = !downloadSocket.isConnected();
+				}
+				catch (ConnectException e) {
+					System.err.println("Connection refused. You need to initiate a server first.");
+				} 
+			}
+
+			while(doNotHaveChunks())
+			{
+				//SEND SUMMARY LIST
+				System.out.println(String.format("Peer %d requested chunks from Host. Peer %d ID Summary: %s", peer_number,peer_number,summary_local.keySet().toString()));
+				getChunks(out, summary_local);
+				System.out.println(String.format("Peer %d requested chunks from %s. Peer %d ID Summary: %s", peer_number,String.format("Peer %d",prev_peer),peer_number,summary_local.keySet().toString()));
+				getChunks(out2, summary_local);
+
+				//READ INTEGER
 				chunk_id=(Integer)in.readObject();
-				//Flag end of sending chunks
-				System.out.println(String.format("Chunk ID %d inside Peer %d ",chunk_id,peer_number));
-				File file = (File) in.readObject();
-				System.out.println(String.format("File %s name inside while",file.toString()));
-				File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s",chunk_id ,".chunk"));
-				System.out.println(String.format("Peer %d received file %s",peer_number,local.toString()));
-				file.renameTo(local);
-				summary_local.put(chunk_id, local);
+				chunk_id2=(Integer)in2.readObject();
+
+				//DEBUG
+				//System.out.println(chunk_id=(Integer)in.readObject());
+				//System.out.println(chunk_id2=(Integer)in2.readObject();
+
+
+				//READ BYTES
+				//Takes care of receiving the bytes and writes them to file instead of just renaming stuff
+				//A chunk_id of -1 signifies that host has no new chunks to send
+				if (chunk_id == -1)
+				{
+					byte[] received_bytes = (byte[]) in.readObject();
+					//System.out.println("Chunk ID is -1");
+				}
+				else
+				{
+					byte[] received_bytes = (byte[]) in.readObject();
+					FileOutputStream filePart;
+					File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s",chunk_id ,".chunk"));
+					filePart = new FileOutputStream(local);
+					filePart.write(received_bytes);
+					filePart.flush();
+					filePart.close();
+					summary_local.put(chunk_id, local);
+					System.out.println(String.format("Peer %d received chunk %d to give summary list: %s", peer_number, chunk_id, summary_local.keySet().toString()));
+				}
+
+				//READ BYTES
+				//Takes care of receiving the bytes and writes them to file instead of just renaming stuff
+				if (chunk_id2 == -1)
+				{
+					byte[] received_bytes2 = (byte[]) in2.readObject();
+					//System.out.println("Chunk ID2 is 0");
+				}
+				else
+				{
+					byte[] received_bytes2 = (byte[]) in2.readObject();
+					FileOutputStream filePart2;
+					File local2 = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s",chunk_id2 ,".chunk"));
+					filePart2 = new FileOutputStream(local2);
+					filePart2.write(received_bytes2);
+					filePart2.flush();
+					filePart2.close();
+					summary_local.put(chunk_id2, local2);
+					System.out.println(String.format("Peer %d received chunk %d to give summary list: %s", peer_number, chunk_id2, summary_local.keySet().toString()));
+				}
 			}
 		}
 		catch (ConnectException e) {
@@ -170,6 +243,8 @@ public class Peer implements Runnable
 				in.close();
 				out.close();
 				requestSocket.close();
+				out.close();
+				downloadSocket.close();
 			}
 			catch(IOException ioException){
 				ioException.printStackTrace();
@@ -177,14 +252,13 @@ public class Peer implements Runnable
 		}
 	}
 	//send a message to the output stream
-	synchronized void getChunks(Map<Integer, File> summary_local)
+	synchronized void getChunks(ObjectOutputStream out, Map<Integer, File> summary_local)
 	{
 		//NOTE: Had serialization issue. I guess you cannot send the 'raw' summary set, and neeed to make a new HashSe
-		summary_sent=new HashSet(summary_local.keySet());
+		//MUST MUST MUST do a shallow copy of this!!!
+		Map <Integer, File> summary_sent=new HashMap<Integer,File>(summary_local);
 		try{
 			//stream write the message
-			System.out.println(String.format("Peer %d requested initial chunks from Host...", peer_number));
-
 			out.writeObject(summary_sent);
 			out.flush();
 		}

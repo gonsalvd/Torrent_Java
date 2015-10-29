@@ -12,7 +12,7 @@ public class Host implements Runnable {
 	private File input_file;
 	private File chunk_folder;
 	private static int size_of_chunks;
-	private static int num_of_chunks;
+	public static int num_of_chunks;
 	private int num_of_users;
 	private String filename;
 	private String BYTE_TYPE = "kB";
@@ -29,14 +29,15 @@ public class Host implements Runnable {
 		makeFolder();
 	}
 	
+	//This ended up being random due to not know Peer Number. Still divides chunks.
 	public Map<Integer,File> createUserSpecificSummary(int clientNumber)
 	{
+		//Create a special summary list for each peer so that we can keep same thread
 		Map<Integer, File> summary_user = new HashMap<Integer,File>();
 		for (int a=0; a<summary_local.size(); a++)
 		{
 			if (clientNumber == (a % TorrentProgram.num_of_users))
 			{
-				System.out.println("here");
 				summary_user.put(a, summary_local.get(a));
 			}
 		}
@@ -57,7 +58,7 @@ public class Host implements Runnable {
 		try {
 			while(true) {
 				try {					
-					Thread peer_thread = new Handler(listener.accept(), createUserSpecificSummary(clientNum));
+					Thread peer_thread = new Handler(listener.accept(), createUserSpecificSummary(clientNum), "Host");
 					peer_thread.start();
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
@@ -149,10 +150,7 @@ public class Host implements Runnable {
 				byteChunkPart = null;
 				filePart = null;
 				System.out.println(String.format("Host has chunk ID %d chunk file: %s", num_of_chunks, chunk_file.toString()));
-
 				num_of_chunks++;
-
-				//				System.out.println(String.format("Filesize: %d", fileSize));
 			}
 			inputStream.close();
 		} catch (IOException exception) {

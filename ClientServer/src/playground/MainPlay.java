@@ -11,7 +11,7 @@ public class MainPlay {
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
 
-		int debug = 1;
+		int debug = 0;
 		switch (debug)
 		{
 
@@ -21,17 +21,72 @@ public class MainPlay {
 			Map<Integer, String> map2 = new HashMap<Integer, String>();
 
 			map1.put(1, "drew");
+			map1.put(2, "drew");
 			map1.put(3, "cathy");
+			map1.put(4, "drew");
 
-			map2.put(2, "steve");
-			map2.put(3, "steve2");
+			map2.put(5, "steve");
 
 			Map<Integer, String> mapdiff = new HashMap<Integer, String>();
 
-			map2.keySet().removeAll(map1.keySet());
+			map1.keySet().removeAll(map2.keySet());
 
-			System.out.println(map2);
-			System.out.println(map2.size());
+			System.out.println(map1);
+			
+			map2.put(1, "drew");
+			
+			map1.keySet().removeAll(map2.keySet());
+
+			System.out.println(map1);
+			
+			map2.put(2, "drew");
+			
+			map1.keySet().removeAll(map2.keySet());
+			
+			map2.put(3, "drew");
+			
+			map1.keySet().removeAll(map2.keySet());
+			
+			map2.put(4, "drew");
+			
+			map1.keySet().removeAll(map2.keySet());
+			
+			System.out.println("Size of map1: "+map1.size());
+			System.out.println("Size of map2: "+map2.size());
+			
+			HashMap<Integer, String> map3 = new HashMap<Integer, String>();
+
+			map3.put(1, "drew");
+			map3.put(2, "drew");
+			map3.put(3, "cathy");
+			map3.put(4, "drew");
+
+			HashMap<Integer, String> map4 = new HashMap<Integer, String>(map3);
+			
+			System.out.println("Map4 shallow copy "+map4.entrySet().toString());
+			
+			map3.remove(2);
+
+			System.out.println(map4.entrySet().toString());
+
+			map4 = map3;
+			System.out.println(map4.entrySet().toString());
+			map3.remove(4);
+			System.out.println(map4.entrySet().toString());
+			
+			Map<Integer, String> map5 = (HashMap) map4.clone();
+			
+			System.out.println(map5.entrySet().toString());
+			
+			map4.remove(1);
+			
+			System.out.println(map5.entrySet().toString());
+
+
+			
+
+			
+			
 			break;
 
 		case 1:
@@ -78,7 +133,11 @@ public class MainPlay {
 				exception.printStackTrace();
 			}
 			break;
-
+		case 2:
+			boolean connected = true;
+			System.out.println(!connected);
+		case 3:
+			System.out.println(Math.floorMod(-1, 5));
 
 		}
 	}

@@ -61,7 +61,6 @@ public class TorrentProgram {
 		{
 			peer_number = a;
 			peer = new Peer(peer_number);
-			peer.setPeerType("Download");
 			Thread p = new Thread(peer);
 			p.start();
 			peer_list.add(peer);
