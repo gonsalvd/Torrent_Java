@@ -13,7 +13,7 @@ import java.util.Scanner;
  */
 public class TorrentProgram {
 
-	private boolean DEBUG_MODE_ON = false;	//debugger
+	private boolean DEBUG_MODE_ON = true;	//debugger
 	private String fullPathname;	//filename to be broken into chunks
 	public static String FILE_FOLDER;	//folder where file located. also where all host/peer chunks will be stored
 	public static String FILENAME;	//filename
@@ -51,11 +51,32 @@ public class TorrentProgram {
 		}
 
 	}
-	
+
+	//Make folder to store Host chunks
+	private void makeFolder()
+	{
+		try
+		{
+			File torrent_folder = new File(TorrentProgram.FILE_FOLDER+"/torrent_tmp/");
+			if (!torrent_folder.exists()) {
+				if (torrent_folder.mkdir()) {
+					System.out.println(String.format("Directory created for P2P: %s ", torrent_folder.toString()));
+				} else {
+					System.out.println("Failed to create directory!");
+				}
+			}
+		}
+		catch (Exception e)
+		{
+			System.out.println("Invalid file");
+		}
+	}
+
 	//Main will enter program through here
 	public void start()
 	{
 		System.out.println("Starting PEER-TO-PEER 'Circle' architecture system...");
+		makeFolder();
 		createHost();
 		createPeers();
 	}
