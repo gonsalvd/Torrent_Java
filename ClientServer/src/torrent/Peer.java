@@ -6,17 +6,17 @@ import java.nio.*;
 import java.nio.channels.*;
 import java.util.*;
 
+/* The Peer class is a class of users that receive chunks and then trade those amongst themselves creating a Peer to Peer
+ * network. Each Peer is originally started by the main program TorrentProgram as a thread.
+ */
+
 public class Peer implements Runnable
 {
 
-	private File chunk_folder;
-	private File received_file;
-
-	Socket requestSocket;           //socket connect to the server
-	Socket downloadSocket;
-	ServerSocket uploadSocket;
-	//	ServerSocket uploadSocket = null;
-	//	private int sPort;   //The server will be listening on this port number
+	private File chunk_folder;		//folder to save peer's chunks in
+	private Socket requestSocket;           //socket connect to the server
+	private Socket downloadSocket;		//the socket this peer will use to download on and connect with other peer
+	private ServerSocket uploadSocket; 	//the socket this peer will use to upload on and allow other peer to connect to
 
 	ObjectOutputStream out;         //stream write to the socket
 	ObjectInputStream in;          //stream read from the socket
@@ -25,14 +25,12 @@ public class Peer implements Runnable
 	String message;                //message send to the server
 	String MESSAGE;                //capitalized message read from the server
 
-	Map<Integer, File> summary_local = new HashMap<Integer, File>();
-	Map<Integer, File> summary_diff = new HashMap<Integer, File>();
-	Set summary_sent;
-	int chunk_id;
-	int chunk_id2;
-	private int peer_number;
-	private int prev_peer;
-	boolean notConnected = true;
+	Map<Integer, File> summary_local = new HashMap<Integer, File>();	//the chunk id summary list for this peer
+	int chunk_id;	//the chunk_id received from host
+	int chunk_id2; //the chunk_id received from peer
+	private int peer_number;	//this peers number
+	private int prev_peer;		//the previous peers number in the circle (used to connect with)
+	boolean notConnected = true;	//used in a loop to allow other peer to connect as download peer on serversocket
 
 
 	public Peer(int peer_number)
@@ -41,6 +39,7 @@ public class Peer implements Runnable
 		makeFolder();
 	}
 
+	//Method to combine chunks into one file
 	private void recreateFile()
 	{
 		String fileOutputName = "song.mp3";
@@ -52,6 +51,7 @@ public class Peer implements Runnable
 		String outputFolderName = chunk_folder.toString();
 		File directory = new File(outputFolderName);
 		File[] directoryListing = directory.listFiles();
+		//Loop through files writing to file
 		for (File chunk_file : directoryListing)
 		{
 			try {
@@ -76,6 +76,7 @@ public class Peer implements Runnable
 		System.out.println(String.format("Combined chunks in Peer %d to form file %s in %s", peer_number,fileOutputName, chunk_folder.toString()));
 	}
 
+	//Method to make a folder for peer to store chunks in
 	private void makeFolder()
 	{
 		try
@@ -95,31 +96,20 @@ public class Peer implements Runnable
 		}
 	}
 
-	Set<Integer> sendDownloadList()
-	{
-		System.out.println("Chunk ID List sent by downloader...");
-		return summary_diff.keySet();
-	}
-
-	Set<Integer> sendUploadList()
-	{
-		System.out.println("Chunk ID List sent by uploader...");
-		return summary_local.keySet();
-	}
-
+	//Boolean to keep Peer looking for chunks until all chunks are received
 	private boolean doNotHaveChunks()
 	{
 		return summary_local.size() < Host.num_of_chunks;
 	}
 
+	//Run runs from runnable when thread started
 	public void run()
 	{
 		try
 		{
-			//create a socket to connect to the server
+			//SETUP PEER TO HOST SERVER CONNECTION
 			requestSocket = new Socket("localhost", 8000);
 			System.out.println(String.format("Peer %d connected to Host in port 8000", peer_number));
-			//initialize inputStream and outputStream
 			out = new ObjectOutputStream(requestSocket.getOutputStream());
 			out.flush();
 			in = new ObjectInputStream(requestSocket.getInputStream());
@@ -128,32 +118,37 @@ public class Peer implements Runnable
 			//EXAMPLE: Peer 2 uploads to Peer 3 on port 20002, Peer 3 downloads from Peer 2 on port 20002
 
 			//Create connection as UPLOADER to other peer
+			//Next peer is found as mod of value. Peers range from 0...N
 			int next_peer = Math.floorMod((peer_number + 1),TorrentProgram.num_of_users);
+			//20000 is an arbitrary (probably) unused port. Ex: Peer 0 will open up port 20000 for listening to incoming connections
 			int upload_port = 20000 + peer_number;
 			System.out.println(String.format("Peer %d is the uploader to Peer %d on port %d", peer_number, next_peer, upload_port));
+			//Must create ServerSocket on the peer that will become the upload peer
 			uploadSocket = new ServerSocket(upload_port);
 
 			//Create connection as DOWNLOADER to other peer
 			while (notConnected)
 			{
 				try{
+					//This peer attempts to open a thread on the previous peer port as the DOWNLOADER
 					prev_peer = Math.floorMod((peer_number - 1),TorrentProgram.num_of_users);
 					int prev_peer_port = 20000 + prev_peer;
-
+					//Ex: Peer 2 downloads from Peer 1 (thus, Peer 1 uploads to Peer 2)
 					downloadSocket = new Socket("localhost", prev_peer_port);
 					System.out.println(String.format("Peer %d is the downloader to Peer %d on port %d", peer_number, prev_peer, prev_peer_port));
-
 
 					//Start Thread of Peer to Peer
 					Thread peer_thread = new Handler(uploadSocket.accept(), summary_local,String.format("Peer %d",peer_number));
 					System.out.println(String.format("Peer %d succesfully started its own UPLOAD thread on port %d with Peer %d", peer_number, upload_port, next_peer));
 					peer_thread.start();
 
+					//This MUST come after the "Start Thread of Peer to Peer" or else the objectinputstream() hangs
 					//initialize inputStream and outputStream
 					out2 = new ObjectOutputStream(downloadSocket.getOutputStream());
 					out2.flush();
 					in2 = new ObjectInputStream(downloadSocket.getInputStream());
-
+					
+					//If we get a connection then break out of loop
 					notConnected = !downloadSocket.isConnected();
 				}
 				catch (ConnectException e) {
@@ -161,30 +156,25 @@ public class Peer implements Runnable
 				} 
 			}
 
+			//Core loop of sending/receiving
 			while(doNotHaveChunks())
 			{
-				//SEND SUMMARY LIST
+				//SEND SUMMARY LIST to HOST and PEER
 				System.out.println(String.format("Peer %d requested chunks from Host. Peer %d ID Summary: %s", peer_number,peer_number,summary_local.keySet().toString()));
 				getChunks(out, summary_local);
 				System.out.println(String.format("Peer %d requested chunks from %s. Peer %d ID Summary: %s", peer_number,String.format("Peer %d",prev_peer),peer_number,summary_local.keySet().toString()));
 				getChunks(out2, summary_local);
 
-				//READ INTEGER
+				//READ INTEGER from HOST and PEER
 				chunk_id=(Integer)in.readObject();
 				chunk_id2=(Integer)in2.readObject();
 
-				//DEBUG
-				//System.out.println(chunk_id=(Integer)in.readObject());
-				//System.out.println(chunk_id2=(Integer)in2.readObject();
-
-
-				//READ BYTES
+				//READ CHUNK BYTES from HOST
 				//Takes care of receiving the bytes and writes them to file instead of just renaming stuff
 				//A chunk_id of -1 signifies that host has no new chunks to send
 				if (chunk_id == -1)
 				{
 					byte[] received_bytes = (byte[]) in.readObject();
-					//System.out.println("Chunk ID is -1");
 				}
 				else
 				{
@@ -199,12 +189,11 @@ public class Peer implements Runnable
 					System.out.println(String.format("Peer %d received chunk %d to give summary list: %s", peer_number, chunk_id, summary_local.keySet().toString()));
 				}
 
-				//READ BYTES
-				//Takes care of receiving the bytes and writes them to file instead of just renaming stuff
+				//READ CHUNK BYTES from PEER
+				//Takes care of receiving the bytes and writes them to file 
 				if (chunk_id2 == -1)
 				{
 					byte[] received_bytes2 = (byte[]) in2.readObject();
-					//System.out.println("Chunk ID2 is 0");
 				}
 				else
 				{
@@ -219,6 +208,7 @@ public class Peer implements Runnable
 					System.out.println(String.format("Peer %d received chunk %d to give summary list: %s", peer_number, chunk_id2, summary_local.keySet().toString()));
 				}
 			}
+			//After all chunks are received, merge chunks into single file
 			recreateFile();
 		}
 		catch (ConnectException e) {
@@ -247,11 +237,11 @@ public class Peer implements Runnable
 			}
 		}
 	}
-	//send a message to the output stream
+	
+	//Send a summary list for the Peer to the Host or other Peer with the chunks he/she has
 	synchronized void getChunks(ObjectOutputStream out, Map<Integer, File> summary_local)
 	{
-		//NOTE: Had serialization issue. I guess you cannot send the 'raw' summary set, and neeed to make a new HashSe
-		//MUST MUST MUST do a shallow copy of this!!!
+		//MUST MUST MUST pass a copy and not a reference or else you will have update/reading issues! Use 'new'!
 		Map <Integer, File> summary_sent=new HashMap<Integer,File>(summary_local);
 		try{
 			//stream write the message
@@ -262,17 +252,4 @@ public class Peer implements Runnable
 			ioException.printStackTrace();
 		}
 	}
-
-	void initializePeerNumberWithHost()
-	{
-		try {
-			out.writeObject(this.peer_number);
-			out.flush();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
-
-
 }

@@ -6,19 +6,21 @@ import java.nio.*;
 import java.nio.channels.*;
 import java.util.*;
 
+/* Host is the user with the original file that is to be sent
+ * 
+ */
+
 public class Host implements Runnable {
 
-	private static final int sPort = 8000;   //The server will be listening on this port number
-	private File input_file;
-	private File chunk_folder;
-	private static int size_of_chunks;
-	public static int num_of_chunks;
-	private int num_of_users;
-	private String filename;
-	private String BYTE_TYPE = "kB";
-	private Map<Integer, File> summary_local = new HashMap<Integer, File>();
-	private Map<Integer, File> summary_user = new HashMap<Integer, File>();
-
+	private final int sPort = 8000;   //the host server will be listening on this port number for incoming connections
+	private File input_file;	//the file to be split up
+	private File chunk_folder;	//the location to store the chunks
+	private int size_of_chunks;	//the size (kb, Mb, etc) of the chunks
+	public static int num_of_chunks;	//number of chunks created based on the size_of_chunks
+	private int num_of_users;	//number of users in the program. num of users to receive chunks
+	private String filename;	//filename to be split
+	private String BYTE_TYPE = "kB";	//part of creating chunks	
+	private Map<Integer, File> summary_local = new HashMap<Integer, File>();	//chunk summary of host
 
 	public Host(String filename, int size_of_chunks, String byte_type, int num_of_users)
 	{
@@ -29,11 +31,14 @@ public class Host implements Runnable {
 		makeFolder();
 	}
 	
-	//This ended up being random due to not know Peer Number. Still divides chunks.
+	//Creates custom chunk ID sets divided equally amongst number of users in program
+	//Ex: 5 users in program (Peers 0,1,2,3,4) . 10 chunks (0..9). A user will get chunks (0,5) or 1,6 or 4,9...
 	public Map<Integer,File> createUserSpecificSummary(int clientNumber)
 	{
-		//Create a special summary list for each peer so that we can keep same thread
+		//Create a special summary list for each peer
 		Map<Integer, File> summary_user = new HashMap<Integer,File>();
+		//Ex: number of chunks = 10, a ranges from 0 to 9, num of users = 5, client numbers from 0 to 4
+		//Ex: 0 mod 5 = 0, 4 mod 5 = 4, 5 mod 5 = 0, 9 mod 5 = 4, etc
 		for (int a=0; a<summary_local.size(); a++)
 		{
 			if (clientNumber == (a % TorrentProgram.num_of_users))
@@ -44,6 +49,7 @@ public class Host implements Runnable {
 		return summary_user;
 	}
 
+	//Main function
 	public void run() {
 		// TODO Auto-generated method stub
 		System.out.println("The Host is running..."); 
@@ -54,10 +60,13 @@ public class Host implements Runnable {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		//Clients range from 0..N-1
 		int clientNum = 0;
 		try {
+			//Keep listening for peers to connect
 			while(true) {
-				try {					
+				try {		
+					//Create thread for incoming peer initiated with custom user summary of chunks available to send
 					Thread peer_thread = new Handler(listener.accept(), createUserSpecificSummary(clientNum), "Host");
 					peer_thread.start();
 				} catch (IOException e) {
@@ -76,6 +85,7 @@ public class Host implements Runnable {
 		} 
 	}
 	
+	//Make folder to store Host chunks
 	private void makeFolder()
 	{
 		try
@@ -95,6 +105,7 @@ public class Host implements Runnable {
 		}
 	}
 
+	//Load the file for host that will be broken into chunks
 	public void loadFile()
 	{
 		System.out.println("Loading file at Host...");
@@ -102,11 +113,12 @@ public class Host implements Runnable {
 		breakFile();
 	}
 
+	//Break the file into chunks based on chunk size
 	private void breakFile()
 	{
 		File inputFile = new File(this.filename);
-		String outputFileName = chunk_folder.toString();
 
+		//Streams that read/write to Files
 		FileInputStream inputStream;
 		FileOutputStream filePart;
 
@@ -118,7 +130,6 @@ public class Host implements Runnable {
 		int read = 0;
 		int readLength=0;
 		byte[] byteChunkPart;
-
 
 		//Determine how to break file based on input
 		if( BYTE_TYPE == "kB" )
@@ -135,6 +146,7 @@ public class Host implements Runnable {
 			//The fileinputstream becomes this buffer that gets smaller as your .read() out of it
 			inputStream = new FileInputStream(inputFile);
 
+			//Keep breaking file while there are still chunks left. Reused code.
 			while (fileSize > 0) 
 			{
 				byteChunkPart = new byte[readLength];

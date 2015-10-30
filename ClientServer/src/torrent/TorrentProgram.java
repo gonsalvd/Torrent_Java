@@ -8,16 +8,17 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Scanner;
 
+/*This is the program that you could say runs centrally and coordinates the start of Hosts and Peers
+ * 
+ */
 public class TorrentProgram {
 
-	private boolean DEBUG_MODE_ON = true;
-
-	private String filename;
-	public static String FILE_FOLDER;
-	public static int num_of_users;
-	private static int num_of_chunks;
-	private int size_of_chunks;
-	private String BYTE_TYPE = "kB";
+	private boolean DEBUG_MODE_ON = true;	//debugger
+	private String filename;	//filename to be broken into chunks
+	public static String FILE_FOLDER;	//folder where file located. also where all host/peer chunks will be stored
+	public static int num_of_users;	//number of users (peers) in system
+	private int size_of_chunks;	//size of chunks
+	private String BYTE_TYPE = "kB";	//type of size of chunks
 	static ArrayList<Peer> peer_list = new ArrayList<Peer>();
 	File local;
 	Host host;
