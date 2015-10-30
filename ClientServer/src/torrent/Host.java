@@ -28,9 +28,10 @@ public class Host implements Runnable {
 		this.size_of_chunks=size_of_chunks;
 		this.num_of_users = num_of_users;
 		this.BYTE_TYPE = byte_type;
+		System.out.println(String.format("Host was created..."));
 		makeFolder();
 	}
-	
+
 	//Creates custom chunk ID sets divided equally amongst number of users in program
 	//Ex: 5 users in program (Peers 0,1,2,3,4) . 10 chunks (0..9). A user will get chunks (0,5) or 1,6 or 4,9...
 	public Map<Integer,File> createUserSpecificSummary(int clientNumber)
@@ -67,7 +68,7 @@ public class Host implements Runnable {
 			while(true) {
 				try {		
 					//Create thread for incoming peer initiated with custom user summary of chunks available to send
-					Thread peer_thread = new Handler(listener.accept(), createUserSpecificSummary(clientNum), "Host");
+					Thread peer_thread = new Handler(listener.accept(), createUserSpecificSummary(clientNum), "Host", -1);
 					peer_thread.start();
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
@@ -84,7 +85,7 @@ public class Host implements Runnable {
 			}
 		} 
 	}
-	
+
 	//Make folder to store Host chunks
 	private void makeFolder()
 	{
@@ -116,15 +117,16 @@ public class Host implements Runnable {
 	//Break the file into chunks based on chunk size
 	private void breakFile()
 	{
+		//Size of file in bytes
 		File inputFile = new File(this.filename);
+		int fileSize = (int) inputFile.length();
+		
+		System.out.println(String.format("Size of file in bytes: %d", fileSize));
+		System.out.println(String.format("File broken at Host into %d chunks...", num_of_chunks));
 
 		//Streams that read/write to Files
 		FileInputStream inputStream;
 		FileOutputStream filePart;
-
-		//Size of file in bytes
-		int fileSize = (int) inputFile.length();
-		System.out.println(String.format("Size of file in bytes: %d", fileSize));
 
 		num_of_chunks = 0;
 		int read = 0;
@@ -149,11 +151,16 @@ public class Host implements Runnable {
 			//Keep breaking file while there are still chunks left. Reused code.
 			while (fileSize > 0) 
 			{
+				//Minor tweak so that file sizes are EXACTLY the same
+				if (fileSize < readLength)
+				{
+					readLength = fileSize;
+				}
 				byteChunkPart = new byte[readLength];
 				//When you read from the inputstream then you are kind of decrementing it at the same time. Less is leftover. Original file remains intact.
 				read = inputStream.read(byteChunkPart, 0, readLength);
 				fileSize = fileSize - read;
-				File chunk_file = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s", num_of_chunks,".chunk"));
+				File chunk_file = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%s_host_%s", String.format("%03d",num_of_chunks),".chunk"));
 				summary_local.put(new Integer(num_of_chunks), chunk_file);
 				filePart = new FileOutputStream(chunk_file);
 				filePart.write(byteChunkPart);
@@ -161,13 +168,12 @@ public class Host implements Runnable {
 				filePart.close();
 				byteChunkPart = null;
 				filePart = null;
-				System.out.println(String.format("Host has chunk ID %d chunk file: %s", num_of_chunks, chunk_file.toString()));
+				System.out.println(String.format("Host has Chunk ID %d chunk file: %s", num_of_chunks, chunk_file.toString()));
 				num_of_chunks++;
 			}
 			inputStream.close();
 		} catch (IOException exception) {
 			exception.printStackTrace();
 		}
-		System.out.println(String.format("File broken at Host into %d chunks...", num_of_chunks));
 	}
 }

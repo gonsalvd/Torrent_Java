@@ -42,7 +42,7 @@ public class Peer implements Runnable
 	//Method to combine chunks into one file
 	private void recreateFile()
 	{
-		String fileOutputName = "song.mp3";
+		String fileOutputName = TorrentProgram.FILENAME;
 		File full_file = new File(chunk_folder.toString()+"/"+fileOutputName);
 
 		FileInputStream inputStream;
@@ -51,6 +51,8 @@ public class Peer implements Runnable
 		String outputFolderName = chunk_folder.toString();
 		File directory = new File(outputFolderName);
 		File[] directoryListing = directory.listFiles();
+		//Must sort as listFiles() does not do so. Must pad with 0s as well.
+		Arrays.sort(directoryListing);
 		//Loop through files writing to file
 		for (File chunk_file : directoryListing)
 		{
@@ -109,7 +111,7 @@ public class Peer implements Runnable
 		{
 			//SETUP PEER TO HOST SERVER CONNECTION
 			requestSocket = new Socket("localhost", 8000);
-			System.out.println(String.format("Peer %d connected to Host in port 8000", peer_number));
+			System.out.println(String.format("Peer %d connected to Host on port 8000", peer_number));
 			out = new ObjectOutputStream(requestSocket.getOutputStream());
 			out.flush();
 			in = new ObjectInputStream(requestSocket.getInputStream());
@@ -138,7 +140,7 @@ public class Peer implements Runnable
 					System.out.println(String.format("Peer %d is the downloader to Peer %d on port %d", peer_number, prev_peer, prev_peer_port));
 
 					//Start Thread of Peer to Peer
-					Thread peer_thread = new Handler(uploadSocket.accept(), summary_local,String.format("Peer %d",peer_number));
+					Thread peer_thread = new Handler(uploadSocket.accept(), summary_local,String.format("Peer %d",peer_number),peer_number);
 					System.out.println(String.format("Peer %d succesfully started its own UPLOAD thread on port %d with Peer %d", peer_number, upload_port, next_peer));
 					peer_thread.start();
 
@@ -160,9 +162,11 @@ public class Peer implements Runnable
 			while(doNotHaveChunks())
 			{
 				//SEND SUMMARY LIST to HOST and PEER
-				System.out.println(String.format("Peer %d requested chunks from Host. Peer %d ID Summary: %s", peer_number,peer_number,summary_local.keySet().toString()));
+				System.out.println(String.format("Peer %d requested chunks from Host...", peer_number));
+				System.out.println(String.format("Peer %d sent Chunk ID list to Host...", peer_number));
 				getChunks(out, summary_local);
-				System.out.println(String.format("Peer %d requested chunks from %s. Peer %d ID Summary: %s", peer_number,String.format("Peer %d",prev_peer),peer_number,summary_local.keySet().toString()));
+				System.out.println(String.format("Peer %d requested chunks from %s...", peer_number,String.format("Peer %d",prev_peer)));
+				System.out.println(String.format("Peer %d sent Chunk ID list to %s...", peer_number,String.format("Peer %d",prev_peer)));
 				getChunks(out2, summary_local);
 
 				//READ INTEGER from HOST and PEER
@@ -180,13 +184,13 @@ public class Peer implements Runnable
 				{
 					byte[] received_bytes = (byte[]) in.readObject();
 					FileOutputStream filePart;
-					File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s",chunk_id ,".chunk"));
+					File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%s_host_%s",String.format("%03d",chunk_id) ,".chunk"));
 					filePart = new FileOutputStream(local);
 					filePart.write(received_bytes);
 					filePart.flush();
 					filePart.close();
 					summary_local.put(chunk_id, local);
-					System.out.println(String.format("Peer %d received chunk %d to give summary list: %s", peer_number, chunk_id, summary_local.keySet().toString()));
+					System.out.println(String.format("Peer %d received Chunk ID %d to give Chunk ID list: %s", peer_number, chunk_id, summary_local.keySet().toString()));
 				}
 
 				//READ CHUNK BYTES from PEER
@@ -199,13 +203,13 @@ public class Peer implements Runnable
 				{
 					byte[] received_bytes2 = (byte[]) in2.readObject();
 					FileOutputStream filePart2;
-					File local2 = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%d_host_%s",chunk_id2 ,".chunk"));
+					File local2 = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%s_host_%s",String.format("%03d",chunk_id2) ,".chunk"));
 					filePart2 = new FileOutputStream(local2);
 					filePart2.write(received_bytes2);
 					filePart2.flush();
 					filePart2.close();
 					summary_local.put(chunk_id2, local2);
-					System.out.println(String.format("Peer %d received chunk %d to give summary list: %s", peer_number, chunk_id2, summary_local.keySet().toString()));
+					System.out.println(String.format("Peer %d received Chunk ID %d to give Chunk ID list: %s", peer_number, chunk_id2, summary_local.keySet().toString()));
 				}
 			}
 			//After all chunks are received, merge chunks into single file
