@@ -13,7 +13,7 @@ import java.util.Scanner;
  */
 public class TorrentProgram {
 
-	private boolean DEBUG_MODE_ON = true;	//debugger
+	private boolean DEBUG_MODE_ON = false;	//debugger
 	private String fullPathname;	//filename to be broken into chunks
 	public static String FILE_FOLDER;	//folder where file located. also where all host/peer chunks will be stored
 	public static String FILENAME;	//filename
@@ -88,7 +88,7 @@ public class TorrentProgram {
 		for (int a = 0; a < num_of_users; a++)
 		{
 			peer_number = a;
-			peer = new Peer(peer_number);
+			//peer = new Peer(peer_number);
 			Thread p = new Thread(peer);
 			p.start();
 			peer_list.add(peer);

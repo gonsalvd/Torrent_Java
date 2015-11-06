@@ -1,6 +1,8 @@
 package torrent;
 
 import java.net.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.*;
 import java.nio.*;
 import java.nio.channels.*;
@@ -28,26 +30,64 @@ public class Peer implements Runnable
 	Map<Integer, File> summary_local = new HashMap<Integer, File>();	//the chunk id summary list for this peer
 	int chunk_id;	//the chunk_id received from host
 	int chunk_id2; //the chunk_id received from peer
+	int num_of_chunks;
+	int upload_port;
+	int next_peer;
 	private int peer_number;	//this peers number
+	private int num_of_users;	//number of users in network (except host)
 	private int prev_peer;		//the previous peers number in the circle (used to connect with)
 	boolean notConnected = true;	//used in a loop to allow other peer to connect as download peer on serversocket
+	private String programFilename;
+	Timer timer;
+	Thread peer_thread;
+	int timeout_delay;
 
-
-	public Peer(int peer_number)
+	public static void main(String[] args)
 	{
+		Scanner in = new Scanner(System.in);
+		System.out.println("Enter Peer Number (0..N-1): ");
+		int peer_number = in.nextInt();
+		System.out.println("Enter number of peers in network: ");
+		int number_of_users = in.nextInt();
+//		System.out.println(String.format("Enter program folder to save Peer %s files:",peer_number));
+//		String folder = in.next();
+//		System.out.println(String.format("Enter number of chunks expecting to receive:"));
+//		int number_of_chunks = in.nextInt();
+
+		try {
+			Peer peer = new Peer(peer_number, number_of_users);
+			Thread p = new Thread(peer);
+			p.start();
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	public Peer(int peer_number, int number_of_users)
+	{
+		System.out.println(String.format("Peer %d was created...", peer_number));
 		this.peer_number = peer_number;
+		this.num_of_users = number_of_users;
+		//this.programFilename = programfilename;
+		this.num_of_chunks = 1;
+		//this.peer_number = peer_number;
 		makeFolder();
+		
+		timeout_delay = 3000;
+		timer = new Timer();
+		timer.scheduleAtFixedRate(new GetSocketTask(),1000,timeout_delay);
 	}
 
 	//Method to combine chunks into one file
 	private void recreateFile()
 	{
-		String fileOutputName = TorrentProgram.FILENAME;
+		String fileOutputName = "completefile";
 		File full_file = new File(chunk_folder.toString()+"/"+fileOutputName);
 
 		FileInputStream inputStream;
 		FileOutputStream fileFull;
-		
+
 		String outputFolderName = chunk_folder.toString();
 		File directory = new File(outputFolderName);
 		File[] directoryListing = directory.listFiles();
@@ -83,7 +123,9 @@ public class Peer implements Runnable
 	{
 		try
 		{
-			chunk_folder = new File(TorrentProgram.FILE_FOLDER+String.format("/torrent_tmp/peer%d/",peer_number));
+			//chunk_folder = new File(programFilename+String.format("/peer%d/",peer_number));
+			chunk_folder = new File("/Users/gonsalves-admin/Documents/School/CNT5106C-Network/Proj1/torrent_tmp/"+String.format("/peer%d/",peer_number));
+			System.out.println(String.format("Directory location for Peer %d chunks at: %s",peer_number, chunk_folder.toString()));
 			if (!chunk_folder.exists()) {
 				if (chunk_folder.mkdir()) {
 					System.out.println(String.format("Directory created for peer %d: %s ", peer_number, chunk_folder.toString()));
@@ -101,7 +143,55 @@ public class Peer implements Runnable
 	//Boolean to keep Peer looking for chunks until all chunks are received
 	private boolean doNotHaveChunks()
 	{
-		return summary_local.size() < Host.num_of_chunks;
+		return summary_local.size() < this.num_of_chunks;
+	}
+
+	class GetSocketTask extends TimerTask
+	{
+		@Override
+		public void run() {
+			// TODO Auto-generated method stub
+			if (notConnected)
+			{
+				try{
+					//This peer attempts to open a thread on the previous peer port as the DOWNLOADER
+					prev_peer = Math.floorMod((peer_number - 1),num_of_users);
+					int prev_peer_port = 20000 + prev_peer;
+					//Ex: Peer 2 downloads from Peer 1 (thus, Peer 1 uploads to Peer 2)
+					downloadSocket = new Socket("localhost", prev_peer_port);
+					System.out.println(String.format("Peer %d is the downloader to Peer %d on port %d", peer_number, prev_peer, prev_peer_port));
+
+					//Start Thread of Peer to Peer
+					peer_thread = new Handler(uploadSocket.accept(), summary_local,String.format("Peer %d",peer_number),peer_number,num_of_users,-1);
+					System.out.println(String.format("Peer %d succesfully started its own UPLOAD thread on port %d with Peer %d", peer_number, upload_port, next_peer));
+					peer_thread.start();
+
+					//This MUST come after the "Start Thread of Peer to Peer" or else the objectinputstream() hangs
+					//initialize inputStream and outputStream
+					out2 = new ObjectOutputStream(downloadSocket.getOutputStream());
+					out2.flush();
+					in2 = new ObjectInputStream(downloadSocket.getInputStream());
+
+					//If we get a connection then break out of loop
+					notConnected = !downloadSocket.isConnected();
+				}
+				catch (ConnectException f) {
+					System.err.println(String.format("WAIT %d seconds. Connection timeout. You need to initiate another Peer server first.",timeout_delay/1000));
+				} catch (UnknownHostException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+			else
+			{
+				//System.out.println(String.format("STATUS: Peer %d is still connected to Peer %d", peer_number, prev_peer));
+				//System.out.println("Closing time for Peer "+peer_number);
+				timer.cancel();
+			}
+		}
 	}
 
 	//Run runs from runnable when thread started
@@ -121,43 +211,62 @@ public class Peer implements Runnable
 
 			//Create connection as UPLOADER to other peer
 			//Next peer is found as mod of value. Peers range from 0...N
-			int next_peer = Math.floorMod((peer_number + 1),TorrentProgram.num_of_users);
+			next_peer = Math.floorMod((this.peer_number + 1),this.num_of_users);
 			//20000 is an arbitrary (probably) unused port. Ex: Peer 0 will open up port 20000 for listening to incoming connections
-			int upload_port = 20000 + peer_number;
+			upload_port = 20000 + peer_number;
 			System.out.println(String.format("Peer %d is the uploader to Peer %d on port %d", peer_number, next_peer, upload_port));
 			//Must create ServerSocket on the peer that will become the upload peer
 			uploadSocket = new ServerSocket(upload_port);
-
-			//Create connection as DOWNLOADER to other peer
 			while (notConnected)
 			{
-				try{
-					//This peer attempts to open a thread on the previous peer port as the DOWNLOADER
-					prev_peer = Math.floorMod((peer_number - 1),TorrentProgram.num_of_users);
-					int prev_peer_port = 20000 + prev_peer;
-					//Ex: Peer 2 downloads from Peer 1 (thus, Peer 1 uploads to Peer 2)
-					downloadSocket = new Socket("localhost", prev_peer_port);
-					System.out.println(String.format("Peer %d is the downloader to Peer %d on port %d", peer_number, prev_peer, prev_peer_port));
-
-					//Start Thread of Peer to Peer
-					Thread peer_thread = new Handler(uploadSocket.accept(), summary_local,String.format("Peer %d",peer_number),peer_number);
-					System.out.println(String.format("Peer %d succesfully started its own UPLOAD thread on port %d with Peer %d", peer_number, upload_port, next_peer));
-					peer_thread.start();
-
-					//This MUST come after the "Start Thread of Peer to Peer" or else the objectinputstream() hangs
-					//initialize inputStream and outputStream
-					out2 = new ObjectOutputStream(downloadSocket.getOutputStream());
-					out2.flush();
-					in2 = new ObjectInputStream(downloadSocket.getInputStream());
-					
-					//If we get a connection then break out of loop
-					notConnected = !downloadSocket.isConnected();
+				//System.out.println("here1");
+				//sit and wait for peer to connect
+				//System.out.println("Value of notConnected: "+notConnected);
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
 				}
-				catch (ConnectException e) {
-					System.err.println("Connection refused. You need to initiate a server first.");
-				} 
-			}
 
+			}
+			//System.out.println("here2");
+
+
+//			//Create connection as DOWNLOADER to other peer
+//			while (notConnected)
+//			{
+//				try{
+//					//This peer attempts to open a thread on the previous peer port as the DOWNLOADER
+//					prev_peer = Math.floorMod((peer_number - 1),this.num_of_users);
+//					int prev_peer_port = 20000 + prev_peer;
+//					//Ex: Peer 2 downloads from Peer 1 (thus, Peer 1 uploads to Peer 2)
+//					downloadSocket = new Socket("localhost", prev_peer_port);
+//					System.out.println(String.format("Peer %d is the downloader to Peer %d on port %d", peer_number, prev_peer, prev_peer_port));
+//
+//					//Start Thread of Peer to Peer
+//					Thread peer_thread = new Handler(uploadSocket.accept(), summary_local,String.format("Peer %d",peer_number),peer_number);
+//					System.out.println(String.format("Peer %d succesfully started its own UPLOAD thread on port %d with Peer %d", peer_number, upload_port, next_peer));
+//					peer_thread.start();
+//
+//					//This MUST come after the "Start Thread of Peer to Peer" or else the objectinputstream() hangs
+//					//initialize inputStream and outputStream
+//					out2 = new ObjectOutputStream(downloadSocket.getOutputStream());
+//					out2.flush();
+//					in2 = new ObjectInputStream(downloadSocket.getInputStream());
+//
+//					//If we get a connection then break out of loop
+//					notConnected = !downloadSocket.isConnected();
+//				}
+//				catch (ConnectException e) {
+//					System.err.println("Connection refused. You need to initiate another Peer server first.");
+//				} 
+//			}
+
+			//Find out number of chunks we will receive from Host/ create dummy for Peer
+			num_of_chunks=(Integer)in.readObject();
+			int dummy_num_chunks=(Integer)in2.readObject();
+			
 			//Core loop of sending/receiving
 			while(doNotHaveChunks())
 			{
@@ -234,14 +343,14 @@ public class Peer implements Runnable
 				out.close();
 				requestSocket.close();
 				out.close();
-				downloadSocket.close();
+				//downloadSocket.close();
 			}
 			catch(IOException ioException){
 				ioException.printStackTrace();
 			}
 		}
 	}
-	
+
 	//Send a summary list for the Peer to the Host or other Peer with the chunks he/she has
 	synchronized void getChunks(ObjectOutputStream out, Map<Integer, File> summary_local)
 	{
@@ -256,4 +365,6 @@ public class Peer implements Runnable
 			ioException.printStackTrace();
 		}
 	}
+
+
 }
