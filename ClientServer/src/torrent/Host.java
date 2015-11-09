@@ -12,7 +12,7 @@ import java.util.*;
 
 public class Host implements Runnable {
 
-	private final int sPort = 8000;   //the host server will be listening on this port number for incoming connections
+	private int sPort;   //the host server will be listening on this port number for incoming connections
 	private File input_file;	//the file to be split up
 	private File chunk_folder;	//the location to store the chunks
 	private static int size_of_chunks;	//the size (kb, Mb, etc) of the chunks
@@ -23,6 +23,7 @@ public class Host implements Runnable {
 	private Map<Integer, File> summary_local = new HashMap<Integer, File>();	//chunk summary of host
 	
 	private static boolean DEBUG_MODE_ON = false;	//debugger
+	private static boolean INPUT_MODE = false;
 	private static String fullPathname;	//filename to be broken into chunks
 	public static String FILE_FOLDER;	//folder where file located. also where all host/peer chunks will be stored
 	public static String FILENAME;	//filename
@@ -41,7 +42,7 @@ public class Host implements Runnable {
 			num_of_users = 3;
 			size_of_chunks = 50; //kb
 		}
-		else
+		else if (INPUT_MODE)
 		{
 			Scanner in = new Scanner(System.in);
 			System.out.println("Enter full path to file: ");
@@ -54,6 +55,18 @@ public class Host implements Runnable {
 			System.out.println(String.format("Enter size of chunks (%s): ",BYTE_TYPE));
 			size_of_chunks = in.nextInt();
 			in.close();
+		}
+		//Hardset mode
+		else
+		{
+			Scanner in = new Scanner(System.in);
+			System.out.println("Enter full path to file: ");
+			fullPathname = in.next();
+			local = new File(fullPathname);
+			FILE_FOLDER = local.getParent();
+			FILENAME = local.getName().toString();
+			num_of_users=5;
+			size_of_chunks=100;
 		}
 		try {
 			Host host = new Host(fullPathname, size_of_chunks, BYTE_TYPE, num_of_users);
@@ -73,7 +86,35 @@ public class Host implements Runnable {
 		//this.num_of_users = num_of_users;
 		//this.BYTE_TYPE = byte_type;
 		System.out.println(String.format("Host was created..."));
+		readConfiguration();
 		makeFolder();
+	}
+	
+	private void readConfiguration()
+	{
+		File config = new File("/Users/gonsalves-admin/Documents/School/CNT5106C-Network/Proj1/torrent_tmp/network.config");
+		try {
+			BufferedReader reader = new BufferedReader(new FileReader(config));
+			String line;
+			while ((line = reader.readLine()) != null)
+			{
+				//String word = new Scanner(line);
+				String[] type = line.split(" ");
+				int val = new Integer(type[0]);
+				
+				if (val == -1)
+				{
+					sPort = new Integer(type[1]);
+				}
+			}
+			reader.close();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	//Creates custom chunk ID sets divided equally amongst number of users in program
@@ -112,7 +153,7 @@ public class Host implements Runnable {
 			while(true) {
 				try {		
 					//Create thread for incoming peer initiated with custom user summary of chunks available to send
-					Thread peer_thread = new Handler(listener.accept(), createUserSpecificSummary(clientNum), "Host", -1,num_of_users, num_of_chunks);
+					Thread peer_thread = new Handler(listener.accept(), createUserSpecificSummary(clientNum), "Host", -1,num_of_users, num_of_chunks,FILENAME);
 					peer_thread.start();
 					System.out.println("A Peer connected to host...");
 				} catch (IOException e) {
@@ -139,10 +180,10 @@ public class Host implements Runnable {
 		{
 			//File torrent_folder = new File(FILE_FOLDER+"/torrent_tmp/");
 			File torrent_folder = new File("/Users/gonsalves-admin/Documents/School/CNT5106C-Network/Proj1/torrent_tmp/");
-			System.out.println("Directory location for Program: "+torrent_folder.toString());
+			System.out.println("Directory location for P2P: "+torrent_folder.toString());
 			if (!torrent_folder.exists()) {
 				if (torrent_folder.mkdir()) {
-					System.out.println(String.format("Directory created for P2P: %s ", torrent_folder.toString()));
+					//System.out.println(String.format("Directory created for P2P: %s ", torrent_folder.toString()));
 				} else {
 					System.out.println("Failed to create directory!");
 				}
@@ -161,7 +202,7 @@ public class Host implements Runnable {
 			System.out.println("Directory location for Host: "+chunk_folder.toString());
 			if (!chunk_folder.exists()) {
 				if (chunk_folder.mkdir()) {
-					System.out.println(String.format("Directory created for Host: %s ", chunk_folder.toString()));
+					//System.out.println(String.format("Directory created for Host: %s ", chunk_folder.toString()));
 				} else {
 					System.out.println("Failed to create directory!");
 				}
