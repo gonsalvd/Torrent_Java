@@ -21,7 +21,7 @@ public class Host implements Runnable {
 	private String filename;	//filename to be split
 	private static String BYTE_TYPE = "kB";	//part of creating chunks	
 	private Map<Integer, File> summary_local = new HashMap<Integer, File>();	//chunk summary of host
-	
+
 	private static boolean DEBUG_MODE_ON = false;	//debugger
 	private static boolean INPUT_MODE = false;
 	private static String fullPathname;	//filename to be broken into chunks
@@ -29,7 +29,7 @@ public class Host implements Runnable {
 	public static String FILENAME;	//filename
 	private static File local; //manages local files
 
-	
+
 	public static void main(String[] args)
 	{
 		System.out.println("Created by: Drew Gonsalves");
@@ -89,7 +89,7 @@ public class Host implements Runnable {
 		readConfiguration();
 		makeFolder();
 	}
-	
+
 	private void readConfiguration()
 	{
 		File config = new File("/Users/gonsalves-admin/Documents/School/CNT5106C-Network/Proj1/torrent_tmp/network.config");
@@ -101,7 +101,7 @@ public class Host implements Runnable {
 				//String word = new Scanner(line);
 				String[] type = line.split(" ");
 				int val = new Integer(type[0]);
-				
+
 				if (val == -1)
 				{
 					sPort = new Integer(type[1]);
@@ -193,7 +193,7 @@ public class Host implements Runnable {
 		{
 			System.out.println("Invalid file");
 		}
-		
+
 		//Make Folder for host
 		try
 		{
@@ -221,6 +221,8 @@ public class Host implements Runnable {
 		System.out.println("Loading file at Host...");
 		input_file = new File(this.filename);
 		breakFile();
+		//Test to make sure file could still be merged
+		recreateFile();
 	}
 
 	//Break the file into chunks based on chunk size
@@ -229,7 +231,7 @@ public class Host implements Runnable {
 		//Size of file in bytes
 		File inputFile = new File(this.filename);
 		int fileSize = (int) inputFile.length();
-		
+
 		System.out.println(String.format("Size of file in bytes: %d", fileSize));
 
 		//Streams that read/write to Files
@@ -276,7 +278,7 @@ public class Host implements Runnable {
 				filePart.close();
 				byteChunkPart = null;
 				filePart = null;
-				System.out.println(String.format("Host has Chunk ID %d chunk file: %s", num_of_chunks, chunk_file.toString()));
+				System.out.println(String.format("Host has Chunk ID %d chunk file: %s with size (bytes): %d ", num_of_chunks, chunk_file.toString(), chunk_file.length()));
 				num_of_chunks++;
 			}
 			System.out.println(String.format("File broken at Host into %d chunks...", num_of_chunks));
@@ -284,5 +286,44 @@ public class Host implements Runnable {
 		} catch (IOException exception) {
 			exception.printStackTrace();
 		}
+	}
+
+	//Method to combine chunks into one file
+	private void recreateFile()
+	{
+		//String fileOutputName = "completefile";
+		File full_file = new File(chunk_folder.toString()+"/"+this.input_file.getName());
+
+		FileInputStream inputStream;
+		FileOutputStream fileFull;
+
+		String outputFolderName = chunk_folder.toString();
+		File directory = new File(outputFolderName);
+		File[] directoryListing = directory.listFiles();
+		//Must sort as listFiles() does not do so. Must pad with 0s as well.
+		Arrays.sort(directoryListing);
+		//Loop through files writing to file
+		for (File chunk_file : directoryListing)
+		{
+			try {
+				//Size of file in bytes
+				int fileSize = (int) chunk_file.length();
+				byte[] byteChunkPart;
+				byteChunkPart = new byte[fileSize];
+				inputStream = new FileInputStream(chunk_file);
+				inputStream.read(byteChunkPart, 0, fileSize);
+				fileFull = new FileOutputStream(full_file,true);
+				fileFull.write(byteChunkPart);
+				fileFull.flush();
+				inputStream.close();
+				fileFull.close();
+			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (IOException exception) {
+				exception.printStackTrace();
+			}
+		}
+		System.out.println(String.format("Combined chunks in Host to form file %s in %s", this.input_file.getName(), chunk_folder.toString()));
 	}
 }

@@ -97,7 +97,7 @@ public class Peer implements Runnable
 				//String word = new Scanner(line);
 				String[] type = line.split(" ");
 				int val = new Integer(type[0]);
-				
+
 				if (val == -1)
 				{
 					host_port = new Integer(type[1]);
@@ -197,8 +197,8 @@ public class Peer implements Runnable
 			{
 				try{
 					//This peer attempts to open a thread on the previous peer port as the DOWNLOADER
-//					prev_peer = Math.floorMod((peer_number - 1),num_of_users);
-//					prev_peer_port = 20000 + prev_peer;
+					//					prev_peer = Math.floorMod((peer_number - 1),num_of_users);
+					//					prev_peer_port = 20000 + prev_peer;
 					//Ex: Peer 2 downloads from Peer 1 (thus, Peer 1 uploads to Peer 2)
 					downloadSocket = new Socket("localhost", prev_peer_port);
 					System.out.println(String.format("Peer %d is the downloader to Peer %d on port %d", peer_number, prev_peer, prev_peer_port));
@@ -237,6 +237,7 @@ public class Peer implements Runnable
 	}
 
 	//Run runs from runnable when thread started
+	@SuppressWarnings("unchecked")
 	public void run()
 	{
 		try
@@ -253,9 +254,9 @@ public class Peer implements Runnable
 
 			//Create connection as UPLOADER to other peer
 			//Next peer is found as mod of value. Peers range from 0...N
-//			next_peer = Math.floorMod((this.peer_number + 1),this.num_of_users);
-//			//20000 is an arbitrary (probably) unused port. Ex: Peer 0 will open up port 20000 for listening to incoming connections
-//			upload_port = 20000 + peer_number;
+			//			next_peer = Math.floorMod((this.peer_number + 1),this.num_of_users);
+			//			//20000 is an arbitrary (probably) unused port. Ex: Peer 0 will open up port 20000 for listening to incoming connections
+			//			upload_port = 20000 + peer_number;
 			System.out.println(String.format("Peer %d is the uploader to Peer %d on port %d", peer_number, next_peer, upload_port));
 			//Must create ServerSocket on the peer that will become the upload peer
 			uploadSocket = new ServerSocket(upload_port);
@@ -272,6 +273,10 @@ public class Peer implements Runnable
 				}
 
 			}
+
+			//Send peer number of downloader (self)
+			out.writeObject(this.peer_number);
+			out2.writeObject(this.peer_number);
 
 			//Get filename name
 			original_filename = (String)in.readObject();
@@ -292,20 +297,50 @@ public class Peer implements Runnable
 			//READ CHUNK BYTES from HOST
 			//Takes care of receiving the bytes and writes them to file instead of just renaming stuff
 			//A chunk_id of -1 signifies that host has no new chunks to send
-			for (Map.Entry<Integer,File> entry : chunk_id_summary_receiving.entrySet()) {
-				Integer chunk_id = entry.getKey();
-				File rcv_file = entry.getValue();
+			for (int a = 0; a< chunk_id_summary_receiving.size(); a++) {
+				Integer chunk_id = (Integer) in.readObject();
+				//File rcv_file = entry.getValue();
 
+				
 				byte[] received_bytes = (byte[]) in.readObject();
 				FileOutputStream filePart;
 				File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%s_host_%s",String.format("%03d",chunk_id) ,".chunk"));
-				filePart = new FileOutputStream(local);
-				filePart.write(received_bytes);
-				filePart.flush();
-				filePart.close();
-				summary_local.put(chunk_id, local);
-				System.out.println(String.format("Peer %d received Chunk ID %d to give Chunk ID list: %s", peer_number, chunk_id, summary_local.keySet().toString()));
+				if (!local.exists())
+				{
+					filePart = new FileOutputStream(local);
+					filePart.write(received_bytes);
+					filePart.flush();
+					filePart.close();
+					summary_local.put(chunk_id, local);
+					System.out.println(String.format("Peer %d received Chunk ID %d from Host to give Chunk ID list: %s with size (bytes): %d", peer_number, chunk_id, summary_local.keySet().toString(), (int) local.length()));
+				}
+				else
+				{
+					System.out.println("I tried to write to a currnet location from Host");
+				}
 			}
+//			for (Map.Entry<Integer,File> entry : chunk_id_summary_receiving.entrySet()) {
+//				Integer chunk_id = entry.getKey();
+//				File rcv_file = entry.getValue();
+//
+//				
+//				byte[] received_bytes = (byte[]) in.readObject();
+//				FileOutputStream filePart;
+//				File local = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%s_host_%s",String.format("%03d",chunk_id) ,".chunk"));
+//				if (!local.exists())
+//				{
+//					filePart = new FileOutputStream(local);
+//					filePart.write(received_bytes);
+//					filePart.flush();
+//					filePart.close();
+//					summary_local.put(chunk_id, local);
+//					System.out.println(String.format("Peer %d received Chunk ID %d from Host to give Chunk ID list: %s with size (bytes): %d", peer_number, chunk_id, summary_local.keySet().toString(), (int) local.length()));
+//				}
+//				else
+//				{
+//					System.out.println("I tried to write to a currnet location from Host");
+//				}
+//			}
 
 			//Core loop of sending/receiving
 			while(doNotHaveChunks())
@@ -314,14 +349,15 @@ public class Peer implements Runnable
 				System.out.println(String.format("Peer %d requested chunks from %s...", peer_number,String.format("Peer %d",prev_peer)));
 				System.out.println(String.format("Peer %d sent Chunk ID list to %s...", peer_number,String.format("Peer %d",prev_peer)));
 				getChunks(out2, summary_local);
+
 				try {
-					Thread.sleep(2000);
+					Thread.sleep(3000);
 				} catch (InterruptedException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 
-				chunk_id_summary_receiving=(Map<Integer,File>)in2.readObject();
+				chunk_id_summary_receiving = (Map<Integer,File>)in2.readObject();
 
 				//READ CHUNK BYTES from PEER
 				//Takes care of receiving the bytes and writes them to file 
@@ -331,25 +367,55 @@ public class Peer implements Runnable
 				}
 				else
 				{
-					for (Map.Entry<Integer,File> entry : chunk_id_summary_receiving.entrySet()) 
+					for (int a = 0; a< chunk_id_summary_receiving.size(); a++) 
 					{
-						Integer chunk_id2 = entry.getKey();
-						File rcv_file = entry.getValue();
-
+						Integer chunk_id2 = (Integer) in2.readObject();
+						//File rcv_file = entry.getValue();
+						
 						byte[] received_bytes2 = (byte[]) in2.readObject();
 						FileOutputStream filePart2;
 						File local2 = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%s_host_%s",String.format("%03d",chunk_id2) ,".chunk"));
-						filePart2 = new FileOutputStream(local2);
-						filePart2.write(received_bytes2);
-						filePart2.flush();
-						filePart2.close();
-						summary_local.put(chunk_id2, local2);
-						System.out.println(String.format("Peer %d received Chunk ID %d to give Chunk ID list: %s", peer_number, chunk_id2, summary_local.keySet().toString()));
+						if (!local2.exists())
+						{
+							filePart2 = new FileOutputStream(local2);
+							filePart2.flush();
+							filePart2.write(received_bytes2);
+							filePart2.flush();
+							filePart2.close();
+							summary_local.put(chunk_id2, local2);
+							System.out.println(String.format("Peer %d received Chunk ID %d from Peer %d to give Chunk ID list: %s of size (bytes): %d", peer_number, chunk_id2, prev_peer, summary_local.keySet().toString(), (int) local2.length()));
+						}
+						else
+						{
+							System.out.println("I tried to write to a currnet location from Peer trans");
+						}
 					}
+//					for (Map.Entry<Integer,File> entry : chunk_id_summary_receiving.entrySet()) 
+//					{
+//						Integer chunk_id2 = entry.getKey();
+//						File rcv_file = entry.getValue();
+//						byte[] received_bytes2 = (byte[]) in2.readObject();
+//						FileOutputStream filePart2;
+//						File local2 = new File(chunk_folder.toString()+"/"+String.format("chunk_id=%s_host_%s",String.format("%03d",chunk_id2) ,".chunk"));
+//						if (!local2.exists())
+//						{
+//							filePart2 = new FileOutputStream(local2);
+//							filePart2.flush();
+//							filePart2.write(received_bytes2);
+//							filePart2.flush();
+//							filePart2.close();
+//							summary_local.put(chunk_id2, local2);
+//							System.out.println(String.format("Peer %d received Chunk ID %d from Peer %d to give Chunk ID list: %s of size (bytes): %d", peer_number, chunk_id2, prev_peer, summary_local.keySet().toString(), (int) local2.length()));
+//						}
+//						else
+//						{
+//							System.out.println("I tried to write to a currnet location from Peer trans");
+//						}
+//					}
 				}
 			}
-			//After all chunks are received, merge chunks into single file
 			recreateFile();
+
 		}
 		catch (ConnectException e) {
 			System.err.println("Connection refused. You need to initiate a server first.");
@@ -369,9 +435,8 @@ public class Peer implements Runnable
 				in.close();
 				out.close();
 				in2.close();
-				out.close();
+				out2.close();
 				requestSocket.close();
-				out.close();
 				downloadSocket.close();
 				System.out.println(String.format("Closed Host/Peer connections for Peer %d",peer_number));
 			}
