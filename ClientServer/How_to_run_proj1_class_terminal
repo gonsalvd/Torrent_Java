@@ -1,0 +1,38 @@
+How to run .class files for Proj 1, Network:
+
+***THIS PROGRAM CHUNKS INTO SIZE 100KB CHUNKS AND IS FOR 5 CLIENTS ONLY! HARDCODED!
+USE NUMBERS 0-4 FOR CLIENT NUMBERS AND NOT 1..5!***
+
+Download:
+1)Server.class
+2)Client.class
+3)Handler.class
+4)Client$GetSocketTask.class
+5)network.config
+
+Create a folder called “torrent” and house files inside.
+
+Open up terminal in the parent director of “torrent”
+Ex:
+localhost:Working_Versions gonsalves-admin$ ls
+network.config	p2p.jar		p2p_debug.jar	torrent
+
+(I believe network.config could be in either “torrent” or the parent to “torrent”)
+
+Run the server:
+localhost:Working_Versions gonsalves-admin$ java torrent.Server
+Created by: Drew Gonsalves
+Enter full path to file: 
+/Users/gonsalves-admin/Documents/School/CNT5106C-Network/Proj1/Strang.pdf
+
+Run (5) Clients (***CLIENTS ARE NUMBERED 0-4):
+localhost:Working_Versions gonsalves-admin$ java torrent.Client
+Enter Peer Number (0..N-1): 
+0
+
+Close the clients - they close automatically
+
+Close the server - either in Activity Console OR use ‘ctrl+c’ or else you will get socket error if attempting to run program again because socket is still in use.
+
+Files are saved at (Hardcoded): 
+Combined chunks in Peer 0 to form file Strang.pdf in /Users/gonsalves-admin/Documents/School/CNT5106C-Network/Proj1/torrent_tmp

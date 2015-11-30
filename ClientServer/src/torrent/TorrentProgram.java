@@ -20,10 +20,10 @@ public class TorrentProgram {
 	public static int num_of_users;	//number of users (peers) in system
 	private int size_of_chunks;	//size of chunks
 	private String BYTE_TYPE = "kB";	//type of size of chunks
-	private static ArrayList<Peer> peer_list = new ArrayList<Peer>(); //creates list of all peers created
+	private static ArrayList<Client> peer_list = new ArrayList<Client>(); //creates list of all peers created
 	private File local; //manages local files
-	private Host host; //host who holds initial file/chunks
-	private Peer peer;	//peers who will receive chunks/trade
+	private Server host; //host who holds initial file/chunks
+	private Client peer;	//peers who will receive chunks/trade
 
 	public TorrentProgram()
 	{
@@ -100,7 +100,7 @@ public class TorrentProgram {
 	private void createHost()
 	{
 		try {
-			host = new Host(fullPathname, size_of_chunks, BYTE_TYPE, num_of_users);
+			host = new Server(fullPathname, size_of_chunks, BYTE_TYPE, num_of_users);
 			host.loadFile();
 			Thread h = new Thread(host);
 			h.start();

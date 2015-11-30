@@ -10,7 +10,7 @@ import java.util.*;
  * 
  */
 
-public class Host implements Runnable {
+public class Server implements Runnable {
 
 	private int sPort;   //the host server will be listening on this port number for incoming connections
 	private File input_file;	//the file to be split up
@@ -23,7 +23,7 @@ public class Host implements Runnable {
 	private Map<Integer, File> summary_local = new HashMap<Integer, File>();	//chunk summary of host
 
 	private static boolean DEBUG_MODE_ON = false;	//debugger
-	private static boolean INPUT_MODE = false;
+	private static boolean INPUT_MODE = false;	//hardcoded or not
 	private static String fullPathname;	//filename to be broken into chunks
 	public static String FILE_FOLDER;	//folder where file located. also where all host/peer chunks will be stored
 	public static String FILENAME;	//filename
@@ -56,7 +56,7 @@ public class Host implements Runnable {
 			size_of_chunks = in.nextInt();
 			in.close();
 		}
-		//Hardset mode
+		//Hardset mode (Project turn in mode)
 		else
 		{
 			Scanner in = new Scanner(System.in);
@@ -65,11 +65,13 @@ public class Host implements Runnable {
 			local = new File(fullPathname);
 			FILE_FOLDER = local.getParent();
 			FILENAME = local.getName().toString();
+			//(5) clients! from 0-4
 			num_of_users=5;
+			//Chunks of size 100kb!
 			size_of_chunks=100;
 		}
 		try {
-			Host host = new Host(fullPathname, size_of_chunks, BYTE_TYPE, num_of_users);
+			Server host = new Server(fullPathname, size_of_chunks, BYTE_TYPE, num_of_users);
 			host.loadFile();
 			Thread h = new Thread(host);
 			h.start();
@@ -79,13 +81,14 @@ public class Host implements Runnable {
 		}
 	}
 
-	public Host(String filename, int size_of_chunks, String byte_type, int num_of_users)
+	public Server(String filename, int size_of_chunks, String byte_type, int num_of_users)
 	{
 		this.filename=filename;
 		//this.size_of_chunks=size_of_chunks;
 		//this.num_of_users = num_of_users;
 		//this.BYTE_TYPE = byte_type;
 		System.out.println(String.format("Host was created..."));
+		//Read network.config file
 		readConfiguration();
 		makeFolder();
 	}
@@ -102,8 +105,10 @@ public class Host implements Runnable {
 				String[] type = line.split(" ");
 				int val = new Integer(type[0]);
 
+				//Host =-1 in network.config file, Line reads from file: '-1 8000'
 				if (val == -1)
 				{
+					//This will probably be port=8000
 					sPort = new Integer(type[1]);
 				}
 			}
@@ -118,7 +123,7 @@ public class Host implements Runnable {
 	}
 
 	//Creates custom chunk ID sets divided equally amongst number of users in program
-	//Ex: 5 users in program (Peers 0,1,2,3,4) . 10 chunks (0..9). A user will get chunks (0,5) or 1,6 or 4,9...
+	//Ex: 5 users in program (Peers 0,1,2,3,4) . 10 chunks (0..9). A user will get chunks (0,5) or (1,6) or (4,9)...
 	public Map<Integer,File> createUserSpecificSummary(int clientNumber)
 	{
 		//Create a special summary list for each peer
@@ -228,6 +233,8 @@ public class Host implements Runnable {
 	//Break the file into chunks based on chunk size
 	private void breakFile()
 	{
+		System.out.println(String.format("Breaking file at Host into %d chunks...", num_of_chunks));
+
 		//Size of file in bytes
 		File inputFile = new File(this.filename);
 		int fileSize = (int) inputFile.length();
@@ -291,7 +298,6 @@ public class Host implements Runnable {
 	//Method to combine chunks into one file
 	private void recreateFile()
 	{
-		//String fileOutputName = "completefile";
 		File full_file = new File(chunk_folder.toString()+"/"+this.input_file.getName());
 
 		FileInputStream inputStream;
@@ -300,9 +306,9 @@ public class Host implements Runnable {
 		String outputFolderName = chunk_folder.toString();
 		File directory = new File(outputFolderName);
 		File[] directoryListing = directory.listFiles();
-		//Must sort as listFiles() does not do so. Must pad with 0s as well.
+		//Must sort as listFiles() does not do so. 
 		Arrays.sort(directoryListing);
-		//Loop through files writing to file
+		//Loop through SORTED files writing to file
 		for (File chunk_file : directoryListing)
 		{
 			try {
